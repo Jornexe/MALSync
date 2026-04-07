@@ -16,6 +16,7 @@ import { estimation } from './settings-structure-estimation';
 import { links } from './settings-structure-links';
 import { notifications } from './settings-structure-notifications';
 import { missingGeneralPermissions, permissionsOverview } from './settings-structure-permissions';
+import { mongodb } from './settings-structure-mongodb';
 
 export const structure: ConfObj[] = [
   {
@@ -138,6 +139,16 @@ export const structure: ConfObj[] = [
         component: SettingsListSync,
       },
     ],
+  },
+  {
+    key: 'mongodbSection',
+    title: 'MongoDB Sync',
+    system: 'userscript',
+    props: {
+      icon: 'cloud_sync',
+    },
+    component: SettingsGroup,
+    children: mongodb,
   },
   {
     key: 'DiscordSection',

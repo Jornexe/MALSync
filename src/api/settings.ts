@@ -124,6 +124,16 @@ export const settingsObj = {
     shikiOptions: {
       locale: 'ru',
     },
+
+    mongodbEnabled: false,
+    mongodbUrl: '',
+    mongodbDatabase: 'malsync',
+    mongodbUsername: '',
+    mongodbPassword: '',
+    mongodbSyncMode: 'bidirectional',
+    mongodbSyncInterval: 300,
+    mongodbConflictResolution: 'newest',
+    mongodbEncryptData: false,
   }),
 
   debounceArray: {},

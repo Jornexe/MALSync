@@ -11,6 +11,7 @@ import { floatClick } from './floatbutton/userscript';
 import { initUserProgressScheduler } from './background/releaseProgress';
 import { pwa } from './floatbutton/userscriptPwa';
 import { databaseRequest, initDatabase } from './background/database';
+import { initSync } from './background/mongoSync';
 import { anilistOauth } from './anilist/oauth';
 import { shikiOauth } from './_provider/Shikimori/oauth';
 import { Chibi } from './pages-chibi/ChibiProxy';
@@ -139,12 +140,23 @@ function inIframe() {
 }
 
 let dbActive = false;
+let mongoSyncActive = false;
+
 function injectDb() {
   api.request.database = async (call, param) => {
     if (!dbActive) {
       await initDatabase();
       dbActive = true;
     }
+    
+    // Initialize MongoDB sync if enabled (but don't block on it)
+    if (!mongoSyncActive && api.type === 'userscript') {
+      mongoSyncActive = true;
+      initSync().catch(err => {
+        con.error('MongoDB sync initialization failed:', err);
+      });
+    }
+    
     return databaseRequest(call, param);
   };
 }

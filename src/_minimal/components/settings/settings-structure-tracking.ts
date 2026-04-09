@@ -70,6 +70,36 @@ export const trackingSimple: ConfObj[] = [
     },
     component: SettingsGeneral,
   },
+  {
+    key: 'spacetimeUri',
+    title: () => 'SpaceTimeDB URI',
+    condition: () =>
+      api.settings.get('syncMode') === 'SPACETIMEDB' ||
+      api.settings.get('syncModeSimkl') === 'SPACETIMEDB',
+    props: {
+      component: 'input',
+      option: 'spacetimeUri',
+      props: {
+        validation: (value: string) => Boolean(value && /^(wss?:\/\/)/i.test(value)),
+      },
+    },
+    component: SettingsGeneral,
+  },
+  {
+    key: 'spacetimeDatabase',
+    title: () => 'SpaceTimeDB Database',
+    condition: () =>
+      api.settings.get('syncMode') === 'SPACETIMEDB' ||
+      api.settings.get('syncModeSimkl') === 'SPACETIMEDB',
+    props: {
+      component: 'input',
+      option: 'spacetimeDatabase',
+      props: {
+        validation: (value: string) => Boolean(value && value.trim().length > 0),
+      },
+    },
+    component: SettingsGeneral,
+  },
 ];
 
 export const tracking: ConfObj[] = [

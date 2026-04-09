@@ -24,6 +24,10 @@ export function search(
   if (syncMode === 'ANILIST') {
     return aniSearch(keyword, type, options, sync);
   }
+  if (syncMode === 'SPACETIMEDB') {
+    // SpaceTimeDB is storage-only for list state; use AniList for title lookup.
+    return aniSearch(keyword, type, options, sync);
+  }
   if (syncMode === 'MANGABAKA') {
     return mangaBakaSearch(keyword, type, options, sync);
   }

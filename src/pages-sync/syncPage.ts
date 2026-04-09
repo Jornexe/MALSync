@@ -12,6 +12,7 @@ import { getPageConfig } from '../utils/test';
 import { status } from '../_provider/definitions';
 import { getTrackingMode, TrackingModeType } from './trackingMode';
 import type { ProgressElement, TrackingModeInterface } from './trackingMode/TrackingModeInterface';
+import { getSyncMode } from '../_provider/helper';
 import {
   resumeMessageElement,
   trackingBarElement,
@@ -181,7 +182,7 @@ export class SyncPage {
       );
       this.searchObj.setPage(this.page);
       this.searchObj.setSyncPage(this);
-      this.searchObj.setLocalUrl(this.generateLocalUrl(this.page, state));
+      this.searchObj.setLocalUrl(this.generateFallbackUrl(this.page, state));
       this.curState = state;
       await this.searchObj.search();
 
@@ -236,7 +237,7 @@ export class SyncPage {
       );
       this.searchObj.setPage(this.page);
       this.searchObj.setSyncPage(this);
-      this.searchObj.setLocalUrl(this.generateLocalUrl(this.page, state));
+      this.searchObj.setLocalUrl(this.generateFallbackUrl(this.page, state));
       this.curState = state;
       await this.searchObj.search();
 
@@ -257,8 +258,23 @@ export class SyncPage {
     let malUrl = this.searchObj.getRuledUrl(state.detectedEpisode);
 
     const localUrl = this.generateLocalUrl(this.page, state);
+    const fallbackUrl = this.generateFallbackUrl(this.page, state);
+    const syncMode = getSyncMode(this.page.type);
 
-    if ((malUrl === null || !malUrl) && api.settings.get('localSync')) {
+    logger.log('Sync provider resolution', {
+      pageType: this.page.type,
+      primaryMode: api.settings.get('syncMode'),
+      secondaryMode: api.settings.get('syncModeSimkl'),
+      splitTracking: api.settings.get('splitTracking'),
+      resolvedMode: syncMode,
+      ruledUrl: malUrl,
+      fallbackUrl,
+    });
+
+    if ((malUrl === null || !malUrl) && syncMode === 'SPACETIMEDB') {
+      logger.log('SpaceTimeDB Fallback');
+      malUrl = fallbackUrl;
+    } else if ((malUrl === null || !malUrl) && api.settings.get('localSync')) {
       logger.log('Local Fallback');
       malUrl = localUrl;
     }
@@ -283,6 +299,11 @@ export class SyncPage {
         if (e instanceof UrlNotSupportedError) {
           this.incorrectUrl();
           throw e;
+        } else if (e instanceof NotFoundError && syncMode === 'SPACETIMEDB') {
+          logger.log('SpaceTimeDB Fallback');
+          tempSingle = getSingle(fallbackUrl);
+          await tempSingle.update();
+          this.singleObj = tempSingle;
         } else if (e instanceof NotFoundError && api.settings.get('localSync')) {
           logger.log('Local Fallback');
           tempSingle = getSingle(localUrl);
@@ -564,6 +585,17 @@ export class SyncPage {
     return `local://${page.name}/${page.type}/${state.identifier}/${encodeURIComponent(
       state.title,
     )}`;
+  }
+
+  public generateSpaceTimeDbUrl(page, state) {
+    return `stdb://${page.type}/${encodeURIComponent(state.identifier)}`;
+  }
+
+  public generateFallbackUrl(page, state) {
+    if (getSyncMode(page.type) === 'SPACETIMEDB') {
+      return this.generateSpaceTimeDbUrl(page, state);
+    }
+    return this.generateLocalUrl(page, state);
   }
 
   // eslint-disable-next-line consistent-return

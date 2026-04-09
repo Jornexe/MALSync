@@ -1,4 +1,12 @@
-export type SyncTypes = 'MAL' | 'ANILIST' | 'KITSU' | 'SIMKL' | 'SHIKI' | 'MALAPI' | 'MANGABAKA';
+export type SyncTypes =
+  | 'MAL'
+  | 'ANILIST'
+  | 'KITSU'
+  | 'SIMKL'
+  | 'SHIKI'
+  | 'MALAPI'
+  | 'MANGABAKA'
+  | 'SPACETIMEDB';
 
 export function getSyncMode(type = '' as 'anime' | 'manga' | '') {
   const primaryMode = api.settings.get('syncMode') as SyncTypes;
@@ -38,6 +46,13 @@ const providers: { [key in SyncTypes]: ProviderOption } = {
   MANGABAKA: { title: 'MangaBaka', value: 'MANGABAKA', anime: false, manga: true, short: true },
   SIMKL: { title: 'Simkl', value: 'SIMKL', anime: true, manga: false, short: true },
   SHIKI: { title: 'Shikimori', value: 'SHIKI', anime: true, manga: true, short: true },
+  SPACETIMEDB: {
+    title: 'SpaceTimeDB',
+    value: 'SPACETIMEDB',
+    anime: true,
+    manga: true,
+    short: true,
+  },
   MALAPI: {
     title: 'MyAnimeList (API) [WORSE]',
     value: 'MALAPI',

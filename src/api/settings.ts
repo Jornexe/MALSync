@@ -120,6 +120,10 @@ export const settingsObj = {
     mangabakaToken: '',
     mangabakaRefresh: '',
 
+    spacetimeUri: 'ws://127.0.0.1:3000',
+    spacetimeDatabase: 'mal',
+    spacetimeToken: '',
+
     shikiToken: '',
     shikiOptions: {
       locale: 'ru',

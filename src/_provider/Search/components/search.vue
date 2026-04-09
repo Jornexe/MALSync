@@ -21,7 +21,13 @@
     </div>
 
     <div v-if="searchKeyword" class="results">
-      <a class="result" href="" style="cursor: pointer" @click="clickItem($event, '')">
+      <a
+        v-if="items.length === 0"
+        class="result"
+        href=""
+        style="cursor: pointer"
+        @click="clickItem($event, '')"
+      >
         <div class="image"></div>
         <div class="right">
           <span class="title">{{
@@ -41,6 +47,7 @@
         <div class="image"><img :src="item.image" /></div>
         <div class="right">
           <span class="title">{{ item.name }}</span>
+          <p v-if="item.source">Source {{ item.source }}</p>
           <template v-if="item.list">
             <p>{{ lang('UI_Status') }} {{ getStatusText(type, item.list.status) }}</p>
             <p v-if="item.list.score">{{ lang('UI_Score') }} {{ item.list.score }}</p>
@@ -64,6 +71,12 @@ import { PropType } from 'vue';
 import { normalSearch } from '../../../utils/Search';
 import { searchResult } from '../../definitions';
 import { providerTemplates } from '../../../provider/templates';
+import { getSyncMode } from '../../helper';
+import { getSyncList as getSpaceTimeDbSyncList } from '../../SpaceTimeDB/helper';
+
+type SearchDisplayResult = searchResult & {
+  source?: string;
+};
 
 let searchTimeout;
 export default {
@@ -88,7 +101,7 @@ export default {
   },
   data() {
     return {
-      items: [] as searchResult[],
+      items: [] as SearchDisplayResult[],
       loading: false,
       searchKeyword: '',
     };
@@ -119,13 +132,97 @@ export default {
     getStatusText: utils.getStatusText,
     episodeText: utils.episode,
     providerTemplates,
+    async getSpaceTimeDbResults(
+      keyword: string,
+      type: 'anime' | 'manga',
+    ): Promise<SearchDisplayResult[]> {
+      if (getSyncMode(type) !== 'SPACETIMEDB') {
+        return [];
+      }
+
+      const searchTerm = keyword.trim().toLowerCase();
+      if (!searchTerm) {
+        return [];
+      }
+
+      try {
+        const syncList = (await getSpaceTimeDbSyncList()) as Record<string, any>;
+        const results = [] as Array<SearchDisplayResult & { _score: number }>;
+
+        for (const [key, entry] of Object.entries(syncList)) {
+          if (!new RegExp(`^stdb://${type}/`, 'i').test(key)) {
+            continue;
+          }
+
+          const name = String(entry?.name || '').trim();
+          const sourceUrl = String(entry?.sourceUrl || '').trim();
+          const searchText = `${name} ${sourceUrl}`.toLowerCase();
+          if (!searchText.includes(searchTerm)) {
+            continue;
+          }
+
+          const score = name.toLowerCase().startsWith(searchTerm)
+            ? 2
+            : name.toLowerCase().includes(searchTerm)
+              ? 1
+              : 0;
+
+          const entryId = decodeURIComponent(utils.urlPart(key, 3) || '');
+          const maybeNumericId = Number(entryId);
+          const parsedStatus = Number(entry?.status);
+          const parsedScore = Number(entry?.score);
+          const parsedProgress = Number(entry?.progress);
+
+          results.push({
+            id: Number.isFinite(maybeNumericId) ? maybeNumericId : 0,
+            name: name || entryId || '[SDB] Entry',
+            altNames: [],
+            url: sourceUrl || `local://spacetimedb/${type}/${encodeURIComponent(entryId)}`,
+            malUrl: () => Promise.resolve(null),
+            image: String(entry?.image || ''),
+            imageLarge: String(entry?.image || ''),
+            media_type: type,
+            isNovel: false,
+            score: '',
+            year: '',
+            list: {
+              status: Number.isFinite(parsedStatus) ? parsedStatus : 6,
+              score: Number.isFinite(parsedScore) ? parsedScore : 0,
+              episode: Number.isFinite(parsedProgress) ? parsedProgress : 0,
+            },
+            source: 'SpaceTimeDB',
+            _score: score,
+          });
+        }
+
+        return results
+          .sort((a, b) => b._score - a._score)
+          .map(({ _score, ...item }) => item)
+          .slice(0, 8);
+      } catch (error) {
+        con.error('[Correction][SpaceTimeDB] Failed loading search candidates', error);
+        return [];
+      }
+    },
     load() {
       if (this.searchKeyword) {
         this.loading = true;
+        const lookupSource =
+          getSyncMode(this.type) === 'SPACETIMEDB' ? 'AniList (lookup)' : providerTemplates(this.type).shortName;
 
-        normalSearch(this.searchKeyword, this.type).then(items => {
+        Promise.all([
+          this.getSpaceTimeDbResults(this.searchKeyword, this.type),
+          normalSearch(this.searchKeyword, this.type),
+        ]).then(([spaceTimeDbItems, items]) => {
           this.loading = false;
-          this.items = items;
+          const seenUrls = new Set(spaceTimeDbItems.map(item => item.url));
+          const lookupItems = items
+            .filter(item => !seenUrls.has(item.url))
+            .map(item => ({
+              ...item,
+              source: lookupSource,
+            }));
+          this.items = spaceTimeDbItems.concat(lookupItems);
           this.$nextTick(() => {
             this.$el.scrollIntoView({ behavior: 'smooth' });
           });

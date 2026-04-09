@@ -15,6 +15,7 @@ const simklRegex = /^https:\/\/simkl\.com\/(anime|manga)\/(\d+)(\/|$)/;
 const shikiRegex = /^https:\/\/shikimori\.one\/(animes|mangas|ranobe)\/\D?(\d+)/;
 const mangabakaRegex = /^https:\/\/mangabaka\.(?:dev|org)\/(\d+)(\/|$)/;
 const localRegex = /^local:\/\/([^/]+)\/(anime|manga)\/([^/]+)(\/|$)/;
+const spaceTimeDbRegex = /^stdb:\/\/(anime|manga)\/([^/]+)(\/|$)/;
 
 export function urlToSlug(url: string): slugObject {
   const obj: slugObject = {
@@ -85,6 +86,16 @@ export function urlToSlug(url: string): slugObject {
     return obj;
   }
 
+  const spaceTimeDbMatch = url.match(spaceTimeDbRegex);
+  if (spaceTimeDbMatch) {
+    obj.path = {
+      type: spaceTimeDbMatch[1] as 'anime' | 'manga',
+      slug: `stdb:${decodeURIComponent(spaceTimeDbMatch[2])}`,
+    };
+    obj.url = '';
+    return obj;
+  }
+
   return obj;
 }
 
@@ -112,6 +123,9 @@ export function pathToUrl(path: Path): string {
     if (match) {
       return `local://${match[1]}/${path.type}/${decodeURIComponent(match[2])}`;
     }
+  }
+  if (path.slug.startsWith('stdb:')) {
+    return `stdb://${path.type}/${encodeURIComponent(path.slug.substring(5))}`;
   }
 
   throw new Error('Unknown Path Object');

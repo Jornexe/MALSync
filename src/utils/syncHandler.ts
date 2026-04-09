@@ -4,6 +4,7 @@ import { Single as KitsuSingle } from '../_provider/Kitsu/single';
 import { Single as SimklSingle } from '../_provider/Simkl/single';
 import { Single as ShikiSingle } from '../_provider/Shikimori/single';
 import { Single as BakaSingle } from '../_provider/MangaBaka/single';
+import { Single as SpaceTimeDbSingle } from '../_provider/SpaceTimeDB/single';
 
 import { UserList as MalList } from '../_provider/MyAnimeList_hybrid/list';
 import { UserList as AnilistList } from '../_provider/AniList/list';
@@ -11,6 +12,7 @@ import { UserList as KitsuList } from '../_provider/Kitsu/list';
 import { UserList as SimklList } from '../_provider/Simkl/list';
 import { UserList as ShikiList } from '../_provider/Shikimori/list';
 import { UserList as BakaList } from '../_provider/MangaBaka/list';
+import { UserList as SpaceTimeDbList } from '../_provider/SpaceTimeDB/list';
 import { getSyncMode } from '../_provider/helper';
 import { listElement } from '../_provider/listAbstract';
 import { status } from '../_provider/definitions';
@@ -42,6 +44,7 @@ export function getType(url) {
   if (utils.isDomainMatching(url, 'simkl.com')) return 'SIMKL';
   if (utils.isDomainMatching(url, 'shikimori.one')) return 'SHIKI';
   if (utils.isDomainMatching(url, 'mangabaka.org')) return 'MANGABAKA';
+  if (/^stdb:\/\//i.test(url)) return 'SPACETIMEDB';
   throw 'Type not found';
 }
 
@@ -238,6 +241,8 @@ export function syncItem(slave, pageType) {
       singleClass = new ShikiSingle(slave.url);
     } else if (pageType === 'MANGABAKA') {
       singleClass = new BakaSingle(slave.url);
+    } else if (pageType === 'SPACETIMEDB') {
+      singleClass = new SpaceTimeDbSingle(slave.url);
     } else {
       throw 'No sync type';
     }
@@ -352,6 +357,15 @@ export function getListProvider(providerSettingList) {
       providerType: 'SHIKI',
       providerSettings: providerSettingList.shiki,
       listProvider: ShikiList,
+    },
+    {
+      providerType: 'SPACETIMEDB',
+      providerSettings: providerSettingList.spacetimedb || {
+        text: '',
+        list: null,
+        master: false,
+      },
+      listProvider: SpaceTimeDbList,
     },
   ];
 }

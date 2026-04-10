@@ -37,6 +37,23 @@ export function getOverview(url, type, syncMode = '') {
   if (syncMode === 'MALAPI') {
     return new MalApiMeta(url);
   }
+  if (syncMode === 'SPACETIMEDB') {
+    // AniList metadata class does not support stdb:// URLs directly.
+    if (/^stdb:\/\//i.test(url)) {
+      const mediaType = utils.urlPart(url, 2) === 'anime' ? 'anime' : 'manga';
+      const entryId = decodeURIComponent(utils.urlPart(url, 3) || '');
+
+      // Legacy entries may use MAL numeric ids as SpaceTimeDB entry ids.
+      if (/^\d+$/.test(entryId)) {
+        return new AniMeta(`https://myanimelist.net/${mediaType}/${entryId}`);
+      }
+
+      return new LocalMeta(url);
+    }
+
+    // Non-stdb URLs can still use AniList metadata enrichment.
+    return new AniMeta(url);
+  }
 
   throw 'Unknown sync mode';
 }

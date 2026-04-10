@@ -120,13 +120,13 @@
         </template>
         <template
           v-if="
-            (metaRequest.data!.reviews && metaRequest.data!.reviews.length) ||
+            (metaRequest.data?.reviews && metaRequest.data.reviews.length) ||
             singleRequest.data?.getMalUrl()
           "
         >
           <Section>
             <OverviewReviews
-              :reviews="metaRequest.data!.reviews"
+              :reviews="metaRequest.data?.reviews || []"
               :mal-url="singleRequest.data ? singleRequest.data!.getMalUrl()! : ''"
             />
           </Section>
@@ -134,26 +134,26 @@
         </template>
         <template
           v-if="
-            (metaRequest.data!.recommendations && metaRequest.data!.recommendations.length) ||
+            (metaRequest.data?.recommendations && metaRequest.data.recommendations.length) ||
             singleRequest.data?.getMalUrl()
           "
         >
           <Section>
             <OverviewRecommendations
-              :recommendations="metaRequest.data!.recommendations"
+              :recommendations="metaRequest.data?.recommendations || []"
               :mal-url="singleRequest.data ? singleRequest.data!.getMalUrl()! : ''"
             />
           </Section>
         </template>
       </Section>
-      <HR v-if="metaRequest.data && metaRequest.data!.info.length" />
+      <HR v-if="metaRequest.data?.info?.length" />
       <Section
-        v-if="metaRequest.data && metaRequest.data!.info.length"
+        v-if="metaRequest.data?.info?.length"
         class="info-section"
         :loading="totalLoading"
       >
         <OverviewInfo
-          :info="metaRequest.data!.info"
+          :info="metaRequest.data?.info || []"
           :single="singleRequest.data as null | SingleAbstract"
         />
       </Section>

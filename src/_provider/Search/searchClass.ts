@@ -5,8 +5,7 @@
 import { compareTwoStrings } from 'string-similarity';
 
 import { search as pageSearch } from '../searchFactory';
-import { Single as LocalSingle } from '../Local/single';
-import { getRulesCacheKey } from '../singleFactory';
+import { getRulesCacheKey, getSingle } from '../singleFactory';
 import { RulesClass } from './rulesClass';
 
 import { getSyncMode } from '../helper';
@@ -212,9 +211,9 @@ export class SearchClass {
 
   public async searchLocal(): Promise<SearchResult | false> {
     if (!this.localUrl) return false;
-    const local = new LocalSingle(this.localUrl);
-    await local.update();
-    if (!local.isOnList()) return false;
+    const fallbackSingle = getSingle(this.localUrl);
+    await fallbackSingle.update();
+    if (!fallbackSingle.isOnList()) return false;
     this.logger.m('Local').log('On List');
     return {
       url: '',
@@ -413,31 +412,29 @@ export class SearchClass {
     }
 
     function getLink(response, i) {
-      try {
-        return response.responseText.split('<a class="hoverinfo_trigger" href="')[i].split('"')[0];
-      } catch (e) {
-        logger.error(e);
-        try {
-          return response.responseText
-            .split('class="picSurround')
-            [i].split('<a')[1]
-            .split('href="')[1]
-            .split('"')[0];
-        } catch (e2) {
-          logger.error(e2);
-          return false;
-        }
+      const primaryParts = response.responseText.split('<a class="hoverinfo_trigger" href="');
+      if (primaryParts[i]) {
+        const link = primaryParts[i].split('"')[0];
+        if (link) return link;
       }
+
+      const fallbackParts = response.responseText.split('class="picSurround');
+      if (!fallbackParts[i]) return false;
+      const anchorPart = fallbackParts[i].split('<a')[1];
+      if (!anchorPart) return false;
+      const hrefPart = anchorPart.split('href="')[1];
+      if (!hrefPart) return false;
+      const link = hrefPart.split('"')[0];
+      return link || false;
     }
 
     function getTitle(response, link) {
-      try {
-        const id = link.split('/')[4];
-        return response.responseText.split(`rel="#sinfo${id}"><strong>`)[1].split('<')[0];
-      } catch (e) {
-        logger.error(e);
-        return '';
-      }
+      if (!link) return '';
+      const id = link.split('/')[4];
+      if (!id) return '';
+      const titleParts = response.responseText.split(`rel="#sinfo${id}"><strong>`);
+      if (!titleParts[1]) return '';
+      return titleParts[1].split('<')[0] || '';
     }
 
     const response = await api.request.xhr('GET', url);

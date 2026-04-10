@@ -8,6 +8,7 @@ export class Single extends SingleAbstract {
   constructor(protected url: string) {
     super(url);
     this.logger = con.m(this.shortName, '#1b7f6b');
+    this.animeInfo = {};
     return this;
   }
 
@@ -161,11 +162,17 @@ export class Single extends SingleAbstract {
   }
 
   _getDisplayUrl() {
+    if (this.animeInfo?.sourceUrl) return this.animeInfo.sourceUrl;
+
     try {
-      return this.animeInfo.sourceUrl || pathToUrl({ type: this.getType()!, slug: this.entryId });
+      if (this.getType() && this.entryId) {
+        return pathToUrl({ type: this.getType()!, slug: this.entryId });
+      }
     } catch (e) {
-      return this.animeInfo.sourceUrl || 'https://spacetimedb.com';
+      // Ignore invalid path state during transient load errors.
     }
+
+    return 'https://spacetimedb.com';
   }
 
   _getImage() {
@@ -215,6 +222,12 @@ export class Single extends SingleAbstract {
         status: Number((localInfo && localInfo.status) || definitions.status.PlanToWatch),
       };
     } else {
+      if (!this.animeInfo.name) {
+        this.animeInfo.name = this.entryId;
+      }
+      if (!this.animeInfo.sourceUrl) {
+        this.animeInfo.sourceUrl = this.url;
+      }
       this.logger.log('[SpaceTimeDB]', 'update:hit', {
         entryId: this.entryId,
         status: this.animeInfo.status,
@@ -237,7 +250,7 @@ export class Single extends SingleAbstract {
       entryId: this.entryId,
       mediaType: this.getType()!,
       sourceUrl: this.animeInfo.sourceUrl || this.url,
-      title: this.animeInfo.name,
+      title: this.animeInfo.name || this.entryId,
       image: this.animeInfo.image,
       tags: this.animeInfo.tags,
       streamingUrl: this.animeInfo.sUrl,

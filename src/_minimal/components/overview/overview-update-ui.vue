@@ -59,7 +59,7 @@
             v-model="episode"
             :disabled="!single.getTotalEpisodes()"
             :min="0"
-            :max="single.getTotalEpisodes()"
+            :max="episodeSliderMax"
             color="blue"
           />
         </template>
@@ -85,7 +85,7 @@
             v-model="volume"
             :disabled="!single.getTotalVolumes()"
             :min="0"
-            :max="single.getTotalVolumes()"
+            :max="volumeSliderMax"
           />
         </template>
       </div>
@@ -293,6 +293,20 @@ const progress = computed(() => {
   )
     return false;
   return progressEl;
+});
+
+const episodeSliderMax = computed(() => {
+  if (!props.single) return 0;
+  const total = Number(props.single.getTotalEpisodes()) || 0;
+  const current = Number(episode.value) || 0;
+  return Math.max(total, current, 0);
+});
+
+const volumeSliderMax = computed(() => {
+  if (!props.single) return 0;
+  const total = Number(props.single.getTotalVolumes()) || 0;
+  const current = Number(volume.value) || 0;
+  return Math.max(total, current, 0);
 });
 
 async function update() {

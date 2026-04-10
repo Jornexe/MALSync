@@ -279,6 +279,15 @@ export class SyncPage {
       malUrl = localUrl;
     }
 
+    if (syncMode === 'SPACETIMEDB') {
+      logger.log('SpaceTimeDB Canonical URL', {
+        previousUrl: malUrl,
+        canonicalUrl: fallbackUrl,
+      });
+      malUrl = fallbackUrl;
+      tempSingle = undefined;
+    }
+
     if (malUrl === null) {
       j.$('#MalInfo').text(api.storage.lang('Not_Found'));
       j.$('#MalData').css('display', 'none');

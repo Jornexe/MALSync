@@ -597,7 +597,8 @@ export class SyncPage {
   }
 
   public generateSpaceTimeDbUrl(page, state) {
-    return `stdb://${page.type}/${encodeURIComponent(state.identifier)}`;
+    const encodedTitle = state.title ? `/${encodeURIComponent(state.title)}` : '';
+    return `stdb://${page.type}/${encodeURIComponent(state.identifier)}${encodedTitle}`;
   }
 
   public generateFallbackUrl(page, state) {

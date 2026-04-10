@@ -4,6 +4,18 @@ import * as definitions from '../definitions';
 import * as helper from './helper';
 import { pathToUrl, urlToSlug } from '../../utils/slugs';
 
+function normalizeAltTitles(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const dedupe = new Set<string>();
+  value.forEach(el => {
+    if (typeof el !== 'string') return;
+    const trimmed = el.trim();
+    if (!trimmed) return;
+    dedupe.add(trimmed);
+  });
+  return [...dedupe];
+}
+
 export class Single extends SingleAbstract {
   constructor(protected url: string) {
     super(url);
@@ -175,6 +187,16 @@ export class Single extends SingleAbstract {
     return 'https://spacetimedb.com';
   }
 
+  private getTitleFromUrl() {
+    if (this.url.match(/^stdb:\/\//i)) {
+      return decodeURIComponent(utils.urlPart(this.url, 4) || '').trim();
+    }
+    if (this.url.match(/^local:\/\//i)) {
+      return decodeURIComponent(utils.urlPart(this.url, 5) || '').trim();
+    }
+    return '';
+  }
+
   _getImage() {
     if (this.animeInfo && this.animeInfo.image) return this.animeInfo.image;
     return '';
@@ -203,15 +225,18 @@ export class Single extends SingleAbstract {
 
     if (!this.animeInfo) {
       this._onList = false;
+      const titleFromUrl = this.getTitleFromUrl();
       const localInfo =
         /^local:\/\//i.test(this.url) && api.storage ? await api.storage.get(this.url) : null;
 
       this.logger.log('[SpaceTimeDB]', 'update:miss, creating local placeholder', {
         entryId: this.entryId,
+        hasTitleFromUrl: Boolean(titleFromUrl),
         hasLocalFallback: Boolean(localInfo),
       });
       this.animeInfo = {
-        name: (localInfo && localInfo.name) || this.entryId,
+        name: (localInfo && localInfo.name) || titleFromUrl || this.entryId,
+        altTitles: [],
         tags: (localInfo && localInfo.tags) || '',
         sUrl: (localInfo && localInfo.sUrl) || '',
         image: (localInfo && localInfo.image) || '',
@@ -223,8 +248,9 @@ export class Single extends SingleAbstract {
       };
     } else {
       if (!this.animeInfo.name) {
-        this.animeInfo.name = this.entryId;
+        this.animeInfo.name = this.getTitleFromUrl() || this.entryId;
       }
+      this.animeInfo.altTitles = normalizeAltTitles(this.animeInfo.altTitles);
       if (!this.animeInfo.sourceUrl) {
         this.animeInfo.sourceUrl = this.url;
       }
@@ -251,6 +277,7 @@ export class Single extends SingleAbstract {
       mediaType: this.getType()!,
       sourceUrl: this.animeInfo.sourceUrl || this.url,
       title: this.animeInfo.name || this.entryId,
+      altTitles: normalizeAltTitles(this.animeInfo.altTitles),
       image: this.animeInfo.image,
       tags: this.animeInfo.tags,
       streamingUrl: this.animeInfo.sUrl,
@@ -279,5 +306,20 @@ export class Single extends SingleAbstract {
   getStreamingUrl(): string | undefined {
     if (this.animeInfo && this.animeInfo.sUrl) return this.animeInfo.sUrl;
     return super.getStreamingUrl();
+  }
+
+  getAlternativeTitles() {
+    return normalizeAltTitles(this.animeInfo?.altTitles);
+  }
+
+  async setAlternativeTitles(value: string) {
+    this.animeInfo.altTitles = normalizeAltTitles(
+      value
+        .split(',')
+        .map(el => el.trim())
+        .filter(el => el),
+    );
+    await this.sync();
+    await this.update();
   }
 }

@@ -137,6 +137,18 @@
           />
         </template>
       </div>
+
+      <div v-if="isSpaceTimeDbEntry" class="alt-titles-select">
+        <div class="label-row">
+          <span class="label">Alternative titles</span>
+          <FormText
+            v-model="altTitlesInput"
+            type="mini"
+            :simple-placeholder="true"
+            placeholder="Comma-separated aliases"
+          />
+        </div>
+      </div>
     </div>
     <div class="update-buttons">
       <div
@@ -151,7 +163,7 @@
       </div>
       <template v-else>
         <div
-          v-if="single.isDirty()"
+          v-if="single.isDirty() || altTitlesDirty"
           class="update-button"
           tabindex="0"
           @keydown.enter="sync()"
@@ -174,7 +186,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, PropType, ref } from 'vue';
+import { computed, PropType, ref, watch } from 'vue';
 import { SingleAbstract } from '../../../_provider/singleAbstract';
 import FormText from '../form/form-text.vue';
 import FormDropdown from '../form/form-dropdown.vue';
@@ -264,6 +276,35 @@ const scoreTextField = computed({
   },
 });
 
+const isSpaceTimeDbEntry = computed(() => {
+  return Boolean(props.single && (props.single as any).shortName === 'SpaceTimeDB');
+});
+
+const altTitlesInput = ref('');
+const altTitlesBaseline = ref('');
+
+watch(
+  () => props.single,
+  single => {
+    if (!single || typeof (single as any).getAlternativeTitles !== 'function') {
+      altTitlesInput.value = '';
+      altTitlesBaseline.value = '';
+      return;
+    }
+
+    const titles = (single as any).getAlternativeTitles();
+    const normalized = Array.isArray(titles) ? titles.join(', ') : '';
+    altTitlesInput.value = normalized;
+    altTitlesBaseline.value = normalized;
+  },
+  { immediate: true },
+);
+
+const altTitlesDirty = computed(() => {
+  if (!isSpaceTimeDbEntry.value) return false;
+  return altTitlesInput.value.trim() !== altTitlesBaseline.value.trim();
+});
+
 const status = computed({
   get() {
     if (props.single && props.single.isAuthenticated()) {
@@ -312,7 +353,18 @@ const volumeSliderMax = computed(() => {
 async function update() {
   if (props.single) {
     singleLoading.value = true;
+    if (isSpaceTimeDbEntry.value && altTitlesDirty.value) {
+      if (typeof (props.single as any).setAlternativeTitles === 'function') {
+        await (props.single as any).setAlternativeTitles(altTitlesInput.value);
+      }
+    }
     await props.single.update();
+    if (typeof (props.single as any).getAlternativeTitles === 'function') {
+      const updated = (props.single as any).getAlternativeTitles();
+      const normalized = Array.isArray(updated) ? updated.join(', ') : '';
+      altTitlesInput.value = normalized;
+      altTitlesBaseline.value = normalized;
+    }
     singleLoading.value = false;
   }
 }
@@ -320,8 +372,34 @@ async function update() {
 async function sync() {
   if (props.single) {
     singleLoading.value = true;
+
+    if (isSpaceTimeDbEntry.value && altTitlesDirty.value) {
+      if (typeof (props.single as any).setAlternativeTitles === 'function') {
+        await (props.single as any).setAlternativeTitles(altTitlesInput.value);
+      }
+      if (!props.single.isDirty()) {
+        const updated =
+          typeof (props.single as any).getAlternativeTitles === 'function'
+            ? (props.single as any).getAlternativeTitles()
+            : [];
+        const normalized = Array.isArray(updated) ? updated.join(', ') : '';
+        altTitlesInput.value = normalized;
+        altTitlesBaseline.value = normalized;
+        singleLoading.value = false;
+        return;
+      }
+    }
+
     await props.single.sync();
     await props.single.update();
+
+    if (typeof (props.single as any).getAlternativeTitles === 'function') {
+      const updated = (props.single as any).getAlternativeTitles();
+      const normalized = Array.isArray(updated) ? updated.join(', ') : '';
+      altTitlesInput.value = normalized;
+      altTitlesBaseline.value = normalized;
+    }
+
     singleLoading.value = false;
   }
 }
@@ -357,6 +435,10 @@ const episodeLang = utils.episode;
   }
   .score-select {
     min-height: 60px;
+  }
+  .alt-titles-select {
+    margin-top: @spacer-half;
+    min-height: 42px;
   }
   .volume-select {
     margin-bottom: @spacer-half;

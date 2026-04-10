@@ -62,7 +62,7 @@ type option = 'noEncode' | 'noSpecial' | 'noLowercase' | 'specialReplace';
  *    noLowercase -> Dont lowercase everything
  */
 export function searchSyntax(url, title) {
-  let resTitle = title.replace(/^\[l\]/i, '').trim();
+  let resTitle = title.replace(/^(?:\[(?:l|sdb)\]\s*)+/i, '').trim();
   let options: option[] = [];
 
   const found = url.match(/{searchterm(\(.\))?(\[[^[\]]*\])?}/);

@@ -17,6 +17,7 @@ type SpaceTimeSyncRow = {
   mediaType: string;
   sourceUrl: string;
   title: string;
+  altTitles: string[];
   image: string | null;
   tags: string;
   streamingUrl: string | null;
@@ -31,6 +32,7 @@ export type SyncEntryPayload = {
   mediaType: 'anime' | 'manga';
   sourceUrl: string;
   title: string;
+  altTitles?: string[];
   image: string;
   tags: string;
   streamingUrl: string;
@@ -85,6 +87,7 @@ const syncEntryTable = table(
     score: t.u8(),
     status: t.u8(),
     updatedAt: t.timestamp(),
+    altTitles: t.array(t.string()).default([]),
   },
 );
 
@@ -97,6 +100,7 @@ const remoteModule = {
       userKey: t.string(),
       sourceUrl: t.string(),
       title: t.string(),
+      altTitles: t.array(t.string()).optional(),
       image: t.string().optional(),
       tags: t.string(),
       streamingUrl: t.string().optional(),
@@ -136,6 +140,18 @@ function getToken() {
 function normalizeUserKey(value: string | null | undefined) {
   if (!value) return '';
   return value.trim().toLowerCase();
+}
+
+function normalizeAltTitles(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const dedupe = new Set<string>();
+  value.forEach(el => {
+    if (typeof el !== 'string') return;
+    const trimmed = el.trim();
+    if (!trimmed) return;
+    dedupe.add(trimmed);
+  });
+  return [...dedupe];
 }
 
 function getLibraryKey() {
@@ -337,6 +353,7 @@ export async function getSyncList() {
     .reduce((acc, row) => {
       acc[`stdb://${row.mediaType}/${encodeURIComponent(row.entryId)}`] = {
         name: row.title,
+        altTitles: normalizeAltTitles(row.altTitles),
         tags: row.tags,
         sUrl: row.streamingUrl || '',
         image: row.image || '',
@@ -375,6 +392,7 @@ export async function getEntry(entryId: string) {
 
   return {
     name: row.title,
+    altTitles: normalizeAltTitles(row.altTitles),
     tags: row.tags,
     sUrl: row.streamingUrl || '',
     image: row.image || '',
@@ -405,6 +423,7 @@ export async function upsertEntry(payload: SyncEntryPayload) {
     userKey,
     sourceUrl: payload.sourceUrl,
     title: payload.title,
+    altTitles: normalizeAltTitles(payload.altTitles),
     image: payload.image || null,
     tags: payload.tags,
     streamingUrl: payload.streamingUrl || null,

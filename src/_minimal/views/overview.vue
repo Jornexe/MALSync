@@ -16,10 +16,7 @@
             :loading="metaRequest.loading"
             class="header-block"
             :class="{
-              hasTitle:
-                metaRequest.data &&
-                metaRequest.data.alternativeTitle &&
-                metaRequest.data.alternativeTitle.length,
+              hasTitle: mergedAlternativeTitles.length,
             }"
           >
             <div class="statusDotSection">
@@ -41,20 +38,9 @@
             </span>
           </Header>
         </MediaLink>
-        <Modal
-          v-if="
-            metaRequest.data &&
-            metaRequest.data.alternativeTitle &&
-            metaRequest.data.alternativeTitle.length
-          "
-          v-model="titleModal"
-        >
+        <Modal v-if="mergedAlternativeTitles.length" v-model="titleModal">
           <div class="alt-titles">
-            <div
-              v-for="altTitle in [...new Set(metaRequest.data.alternativeTitle)]"
-              :key="altTitle"
-              class="alt-title"
-            >
+            <div v-for="altTitle in mergedAlternativeTitles" :key="altTitle" class="alt-title">
               {{ altTitle }}
             </div>
           </div>
@@ -101,7 +87,7 @@
             singleRequest.data && !totalLoading ? singleRequest.data!.getApiCacheKey() : ''
           "
           :title="singleRequest.data ? singleRequest.data!.getTitle() : ''"
-          :alternative-title="metaRequest.data?.alternativeTitle"
+          :alternative-title="mergedAlternativeTitles"
         />
       </Section>
       <HR v-if="!totalLoading" />
@@ -280,6 +266,20 @@ const cleanDescription = computed(() => {
   if (!description) return '';
   const cleanedBr = description.replace(/(< *\/? *br *\/? *>(\r|\n| )*){2,}/gim, '<br /><br />');
   return cleanedBr.replace(/<a\b/gi, '<a target="_blank" rel="noopener noreferrer"');
+});
+
+const mergedAlternativeTitles = computed(() => {
+  const metaTitles = Array.isArray(metaRequest.data?.alternativeTitle)
+    ? metaRequest.data!.alternativeTitle
+    : [];
+
+  const single = singleRequest.data as unknown as {
+    getAlternativeTitles?: () => string[];
+  } | null;
+
+  const singleTitles = single?.getAlternativeTitles ? single.getAlternativeTitles() : [];
+
+  return [...new Set([...metaTitles, ...singleTitles].filter(Boolean))];
 });
 
 const totalLoading = computed(() => {

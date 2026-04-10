@@ -145,6 +145,15 @@ export default {
         return [];
       }
 
+      const normalizeSearchValue = (value: string) =>
+        value
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/gi, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+      const normalizedSearchTerm = normalizeSearchValue(searchTerm);
+
       try {
         const syncList = (await getSpaceTimeDbSyncList()) as Record<string, any>;
         const results = [] as Array<SearchDisplayResult & { _score: number }>;
@@ -155,17 +164,50 @@ export default {
           }
 
           const name = String(entry?.name || '').trim();
+          const altTitles = Array.isArray(entry?.altTitles)
+            ? entry.altTitles.map((el: unknown) => String(el || '').trim()).filter(Boolean)
+            : [];
           const sourceUrl = String(entry?.sourceUrl || '').trim();
-          const searchText = `${name} ${sourceUrl}`.toLowerCase();
-          if (!searchText.includes(searchTerm)) {
+          const searchText = `${name} ${altTitles.join(' ')} ${sourceUrl}`.toLowerCase();
+          const normalizedSearchText = normalizeSearchValue(searchText);
+          const textMatch = searchText.includes(searchTerm);
+          const normalizedMatch = normalizedSearchTerm
+            ? normalizedSearchText.includes(normalizedSearchTerm)
+            : false;
+          if (!textMatch && !normalizedMatch) {
             continue;
           }
 
-          const score = name.toLowerCase().startsWith(searchTerm)
-            ? 2
-            : name.toLowerCase().includes(searchTerm)
-              ? 1
-              : 0;
+          const nameLower = name.toLowerCase();
+          const normalizedName = normalizeSearchValue(nameLower);
+          const altMatch = altTitles.some(el => {
+            const altLower = el.toLowerCase();
+            const normalizedAlt = normalizeSearchValue(altLower);
+            return (
+              altLower.includes(searchTerm) ||
+              (normalizedSearchTerm ? normalizedAlt.includes(normalizedSearchTerm) : false)
+            );
+          });
+          const altStartsWith = altTitles.some(el => {
+            const altLower = el.toLowerCase();
+            const normalizedAlt = normalizeSearchValue(altLower);
+            return (
+              altLower.startsWith(searchTerm) ||
+              (normalizedSearchTerm ? normalizedAlt.startsWith(normalizedSearchTerm) : false)
+            );
+          });
+          const score =
+            nameLower.startsWith(searchTerm) ||
+            (normalizedSearchTerm ? normalizedName.startsWith(normalizedSearchTerm) : false)
+            ? 3
+            : altStartsWith
+              ? 2
+              :
+                  nameLower.includes(searchTerm) ||
+                  (normalizedSearchTerm ? normalizedName.includes(normalizedSearchTerm) : false) ||
+                  altMatch
+                ? 1
+                : 0;
 
           const entryId = decodeURIComponent(utils.urlPart(key, 3) || '');
           const maybeNumericId = Number(entryId);
@@ -176,7 +218,7 @@ export default {
           results.push({
             id: Number.isFinite(maybeNumericId) ? maybeNumericId : 0,
             name: name || entryId || '[SDB] Entry',
-            altNames: [],
+            altNames: altTitles,
             url: sourceUrl || `local://spacetimedb/${type}/${encodeURIComponent(entryId)}`,
             malUrl: () => Promise.resolve(null),
             image: String(entry?.image || ''),

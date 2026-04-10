@@ -41,6 +41,7 @@ export const SyncEntry = table(
 		score: t.u8(),
 		status: t.u8(),
 		updatedAt: t.timestamp(),
+		altTitles: t.array(t.string()).default([]),
 	},
 );
 

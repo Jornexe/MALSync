@@ -15,6 +15,18 @@ function normalizeUserKey(value: string | null | undefined) {
 	return trimmed.length ? trimmed : undefined;
 }
 
+function normalizeAltTitles(value: string[] | null | undefined) {
+	if (!Array.isArray(value)) return [];
+	const dedupe = new Set<string>();
+	for (const title of value) {
+		if (!title) continue;
+		const trimmed = title.trim();
+		if (!trimmed) continue;
+		dedupe.add(trimmed);
+	}
+	return [...dedupe];
+}
+
 export const upsert_entry = spacetimedb.reducer(
 	{
 		entryId: t.string(),
@@ -22,6 +34,7 @@ export const upsert_entry = spacetimedb.reducer(
 		userKey: t.string(),
 		sourceUrl: t.string(),
 		title: t.string(),
+		altTitles: t.array(t.string()).optional(),
 		image: t.string().optional(),
 		tags: t.string(),
 		streamingUrl: t.string().optional(),
@@ -64,6 +77,7 @@ export const upsert_entry = spacetimedb.reducer(
 			mediaType: params.mediaType,
 			sourceUrl: params.sourceUrl,
 			title: params.title,
+			altTitles: normalizeAltTitles(params.altTitles),
 			image: normalizeValue(params.image),
 			tags: params.tags,
 			streamingUrl: normalizeValue(params.streamingUrl),

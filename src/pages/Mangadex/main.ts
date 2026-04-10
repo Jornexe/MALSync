@@ -58,7 +58,7 @@ export const Mangadex: pageInterface = {
   },
   sync: {
     getTitle(url) {
-      return mangaData.title;
+      return mangaData.title || decodeURIComponent(utils.urlPart(url, 5) || '');
     },
     getIdentifier(url) {
       return mangaData.id;
@@ -131,7 +131,7 @@ export const Mangadex: pageInterface = {
   },
   overview: {
     getTitle(url) {
-      return mangaData.title;
+      return mangaData.title || decodeURIComponent(utils.urlPart(url, 5) || '');
     },
     getIdentifier(url) {
       return mangaData.id;

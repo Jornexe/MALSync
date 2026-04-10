@@ -29,6 +29,14 @@
         @clicked="setOffset"
         @changed="val => (inputOffset = val)"
       ></input-button>
+
+      <input-button
+        v-if="isSpaceTimeDbEntry"
+        label="Alternative titles (comma separated)"
+        :state="altTitlesState"
+        @clicked="setAlternativeTitles"
+      ></input-button>
+
       <div v-if="inputOffset && inputOffset !== '0'" id="offsetUi">
         <div v-for="index in episodeWindow" :key="index" class="offsetBox">
           <div class="mdl-color--primary top">{{ index }}</div>
@@ -102,6 +110,16 @@ export default {
     offset() {
       return this.searchClass.getOffset();
     },
+    isSpaceTimeDbEntry() {
+      const singleObj = this.syncPage && this.syncPage.singleObj;
+      return Boolean(singleObj && singleObj.shortName === 'SpaceTimeDB');
+    },
+    altTitlesState() {
+      const singleObj = this.syncPage && this.syncPage.singleObj;
+      if (!singleObj || typeof singleObj.getAlternativeTitles !== 'function') return '';
+      const titles = singleObj.getAlternativeTitles();
+      return Array.isArray(titles) ? titles.join(', ') : '';
+    },
     episodeWindow() {
       let start = this.currentStateEp + parseInt(this.inputOffset) - 2;
       if (start < 1) start = 1;
@@ -125,6 +143,14 @@ export default {
     },
     setOffset(offset) {
       this.searchClass.setOffset(offset);
+    },
+    async setAlternativeTitles(value) {
+      const singleObj = this.syncPage && this.syncPage.singleObj;
+      if (!singleObj || typeof singleObj.setAlternativeTitles !== 'function') {
+        return;
+      }
+      await singleObj.setAlternativeTitles(value);
+      utils.flashm('Alternative titles updated');
     },
     close() {
       this.$.appContext.app.unmount();

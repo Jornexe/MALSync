@@ -97,5 +97,10 @@ describe('quicklinksBuilder', function() {
       expect('-no game no Life-').to.equal(titleSearch('-{searchtermRaw}-', 'no game/no Life', '123'));
       expect('-no%20game%2Fno%20life-').to.equal(titleSearch('-{searchterm}-', 'no game/no Life', '123'));
     });
+
+    it('[SDB] prefix', function() {
+      expect('-frieren-').to.equal(titleSearch('-{searchterm}-', '[SDB] Frieren', '123'));
+      expect('-Frieren-').to.equal(titleSearch('-{searchtermRaw}-', '[SDB] Frieren', '123'));
+    });
   });
 });

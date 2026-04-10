@@ -123,6 +123,10 @@ export const settingsObj = {
     spacetimeUri: 'ws://127.0.0.1:3000',
     spacetimeDatabase: 'mal',
     spacetimeToken: '',
+    spacetimeProfile: 'profile1',
+    spacetimeUserKey: '',
+    spacetimeProfileLastConfirmed: 'profile1',
+    spacetimeProfileConfirmSkip: false,
 
     shikiToken: '',
     shikiOptions: {

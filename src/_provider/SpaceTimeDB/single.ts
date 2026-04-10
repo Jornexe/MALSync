@@ -265,7 +265,7 @@ export class Single extends SingleAbstract {
 
   _delete() {
     this.logger.log('[SpaceTimeDB]', 'delete:start', { entryId: this.entryId });
-    return helper.deleteEntry(this.entryId).then(() => {
+    return helper.deleteEntry(this.entryId, this.getType()!).then(() => {
       this.logger.log('[SpaceTimeDB]', 'delete:done', { entryId: this.entryId });
     });
   }

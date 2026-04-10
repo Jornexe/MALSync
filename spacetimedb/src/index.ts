@@ -9,10 +9,17 @@ function normalizeValue(value: string | null | undefined) {
 	return trimmed.length ? trimmed : undefined;
 }
 
+function normalizeUserKey(value: string | null | undefined) {
+	if (!value) return undefined;
+	const trimmed = value.trim().toLowerCase();
+	return trimmed.length ? trimmed : undefined;
+}
+
 export const upsert_entry = spacetimedb.reducer(
 	{
 		entryId: t.string(),
 		mediaType: t.string(),
+		userKey: t.string(),
 		sourceUrl: t.string(),
 		title: t.string(),
 		image: t.string().optional(),
@@ -41,13 +48,19 @@ export const upsert_entry = spacetimedb.reducer(
 			throw new SenderError('mediaType must be anime or manga');
 		}
 
-		const id = `${ctx.sender.toHexString()}::${params.entryId}`;
+		const userKey = normalizeUserKey(params.userKey);
+		if (!userKey) {
+			throw new SenderError('userKey is required');
+		}
+		const id = `uk:${userKey}::${params.mediaType}::${params.entryId}`;
+
 		const existing = ctx.db.syncEntry.id.find(id);
 
 		const nextRow = {
 			id,
 			entryId: params.entryId,
 			ownerId: ctx.sender,
+			userKey,
 			mediaType: params.mediaType,
 			sourceUrl: params.sourceUrl,
 			title: params.title,
@@ -81,20 +94,37 @@ export const upsert_entry = spacetimedb.reducer(
 export const delete_entry = spacetimedb.reducer(
 	{
 		entryId: t.string(),
+		mediaType: t.string(),
+		userKey: t.string(),
 	},
-	(ctx, { entryId }) => {
+	(ctx, { entryId, mediaType, userKey }) => {
 		console.log('[SpaceTimeDB][Server] delete_entry:start', {
 			sender: ctx.sender.toHexString(),
 			entryId,
+			mediaType,
+			userKey: normalizeUserKey(userKey) || null,
 		});
 
-		const id = `${ctx.sender.toHexString()}::${entryId}`;
-		const existing = ctx.db.syncEntry.id.find(id);
+		if (mediaType !== 'anime' && mediaType !== 'manga') {
+			throw new SenderError('mediaType must be anime or manga');
+		}
+
+		const normalizedUserKey = normalizeUserKey(userKey);
+		if (!normalizedUserKey) {
+			throw new SenderError('userKey is required');
+		}
+
+		const allRows = [...ctx.db.syncEntry.iter()];
+		const existing = allRows.find(row => {
+			if (row.entryId !== entryId || row.mediaType !== mediaType) return false;
+			return row.userKey === normalizedUserKey;
+		});
+
 		if (!existing) {
-			console.log('[SpaceTimeDB][Server] delete_entry:miss', { id, entryId });
+			console.log('[SpaceTimeDB][Server] delete_entry:miss', { entryId, mediaType });
 			return;
 		}
-		ctx.db.syncEntry.id.delete(id);
-		console.log('[SpaceTimeDB][Server] delete_entry:done', { id, entryId });
+		ctx.db.syncEntry.id.delete(existing.id);
+		console.log('[SpaceTimeDB][Server] delete_entry:done', { id: existing.id, entryId, mediaType });
 	},
 );

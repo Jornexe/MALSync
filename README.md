@@ -1,7 +1,9 @@
 Forked to allow fully selfhosted sync via spacetimedb.
-it is only configured for localhosting spacetime. i personally use tailscale between my devices so it is good enough.
-i have not tested any other configuration (like spacetimes maincloud)
 
+it is only configured for localhosting spacetime. i personally use tailscale between my devices so it is good enough.
+
+i have not tested any other configuration (like spacetimes maincloud)
+i have only tested with userscripts.
 
 [![Discord](https://img.shields.io/discord/358599430502481920.svg?style=flat-square&logo=discord&label=Chat%20%2F%20Support&colorB=7289DA)](https://discord.com/invite/cTH4yaw)
 [![Issues](https://img.shields.io/github/issues/MALSync/MALSync.svg?style=flat-square&logo=github&logoColor=white)](https://github.com/MALSync/MALSync/issues)

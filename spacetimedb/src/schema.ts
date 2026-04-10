@@ -12,6 +12,12 @@ export const SyncEntry = table(
 				columns: ['ownerId'],
 			},
 			{
+				accessor: 'sync_entry_user_key',
+				name: 'sync_entry_user_key',
+				algorithm: 'btree',
+				columns: ['userKey'],
+			},
+			{
 				accessor: 'sync_entry_entry_id',
 				name: 'sync_entry_entry_id',
 				algorithm: 'btree',
@@ -23,6 +29,7 @@ export const SyncEntry = table(
 		id: t.string().primaryKey(),
 		entryId: t.string(),
 		ownerId: t.identity(),
+		userKey: t.string(),
 		mediaType: t.string(),
 		sourceUrl: t.string(),
 		title: t.string(),

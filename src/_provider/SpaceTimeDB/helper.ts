@@ -12,7 +12,8 @@ import {
 type SpaceTimeSyncRow = {
   id: string;
   entryId: string;
-  ownerId: { toHexString: () => string };
+  ownerId: unknown;
+  userKey: string;
   mediaType: string;
   sourceUrl: string;
   title: string;
@@ -55,6 +56,12 @@ const syncEntryTable = table(
         columns: ['ownerId'],
       },
       {
+        accessor: 'sync_entry_user_key',
+        name: 'sync_entry_user_key',
+        algorithm: 'btree',
+        columns: ['userKey'],
+      },
+      {
         accessor: 'sync_entry_entry_id',
         name: 'sync_entry_entry_id',
         algorithm: 'btree',
@@ -66,6 +73,7 @@ const syncEntryTable = table(
     id: t.string().primaryKey(),
     entryId: t.string(),
     ownerId: t.identity(),
+    userKey: t.string(),
     mediaType: t.string(),
     sourceUrl: t.string(),
     title: t.string(),
@@ -86,6 +94,7 @@ const remoteModule = {
     reducerSchema('upsert_entry', {
       entryId: t.string(),
       mediaType: t.string(),
+      userKey: t.string(),
       sourceUrl: t.string(),
       title: t.string(),
       image: t.string().optional(),
@@ -98,6 +107,8 @@ const remoteModule = {
     }),
     reducerSchema('delete_entry', {
       entryId: t.string(),
+      mediaType: t.string(),
+      userKey: t.string(),
     }),
   ).reducersType,
   procedures: [] as const,
@@ -106,6 +117,7 @@ const remoteModule = {
 
 let connectionPromise: Promise<DbConnectionImpl<any>> | null = null;
 let subscribed = false;
+let currentIdentityHex = '';
 
 function getUri() {
   return api.settings.get('spacetimeUri') || uriDefault;
@@ -121,9 +133,50 @@ function getToken() {
   return undefined;
 }
 
+function normalizeUserKey(value: string | null | undefined) {
+  if (!value) return '';
+  return value.trim().toLowerCase();
+}
+
+function getLibraryKey() {
+  const profile = normalizeUserKey(api.settings.get('spacetimeProfile'));
+  if (profile) return profile;
+
+  const legacyProfile = normalizeUserKey(api.settings.get('spacetimeUserKey'));
+  if (legacyProfile) {
+    api.settings.set('spacetimeProfile', legacyProfile);
+    return legacyProfile;
+  }
+
+  return '';
+}
+
+function isSpaceTimeDbModeSelected() {
+  return (
+    api.settings.get('syncMode') === 'SPACETIMEDB' ||
+    api.settings.get('syncModeSimkl') === 'SPACETIMEDB'
+  );
+}
+
+function requireLibraryKey() {
+  const libraryKey = getLibraryKey();
+  if (!libraryKey) {
+    if (isSpaceTimeDbModeSelected()) {
+      const message = 'Please set a profile first in Tracking settings before using SpaceTimeDB.';
+      utils.flashm(message, { error: true, type: 'spacetimedb-library-key' });
+      throw new Error(message);
+    }
+
+    throw new Error('Profile is missing.');
+  }
+
+  return libraryKey;
+}
+
 export function clearSession() {
   con.log(logScope, 'clearSession');
   subscribed = false;
+  currentIdentityHex = '';
   connectionPromise = null;
   return api.settings.set('spacetimeToken', '');
 }
@@ -136,13 +189,37 @@ export function getRegex(listType: 'anime' | 'manga') {
   return new RegExp(`^stdb://${listType}/`, 'i');
 }
 
-function rowOwnerHex(row: SpaceTimeSyncRow) {
-  return row.ownerId.toHexString();
+function normalizeIdentityHex(value: unknown) {
+  if (!value) return '';
+
+  if (typeof value === 'string') {
+    return value.replace(/^0x/i, '').toLowerCase();
+  }
+
+  if (typeof value === 'object') {
+    const candidate = value as {
+      toHexString?: () => string;
+      __identity__?: bigint;
+    };
+
+    if (typeof candidate.toHexString === 'function') {
+      return candidate.toHexString().replace(/^0x/i, '').toLowerCase();
+    }
+
+    if (typeof candidate.__identity__ === 'bigint') {
+      return candidate.__identity__.toString(16);
+    }
+  }
+
+  return '';
+}
+
+function rowLibraryKey(row: SpaceTimeSyncRow) {
+  return normalizeUserKey(row.userKey);
 }
 
 function getCurrentIdentityHex(conn: DbConnectionImpl<any>) {
-  if (!conn.identity) return '';
-  return conn.identity.toHexString();
+  return currentIdentityHex || normalizeIdentityHex(conn.identity);
 }
 
 async function ensureSubscribed(conn: DbConnectionImpl<any>) {
@@ -170,6 +247,8 @@ async function ensureSubscribed(conn: DbConnectionImpl<any>) {
 }
 
 export async function getConnection() {
+  const libraryKey = requireLibraryKey();
+
   if (connectionPromise) {
     con.log(logScope, 'reusing existing connection promise');
     return connectionPromise;
@@ -178,6 +257,7 @@ export async function getConnection() {
   con.log(logScope, 'creating connection', {
     uri: getUri(),
     database: getDatabaseName(),
+    libraryKey,
     tokenPresent: Boolean(getToken()),
   });
 
@@ -188,13 +268,15 @@ export async function getConnection() {
       .withUri(getUri())
       .withDatabaseName(getDatabaseName())
       .withToken(getToken())
-      .onConnect((conn, _identity, token) => {
+      .onConnect((conn, identity, token) => {
+        currentIdentityHex = normalizeIdentityHex(identity) || normalizeIdentityHex(conn.identity);
         con.log(logScope, 'connected', {
-          identity: conn.identity?.toHexString() || 'anonymous',
-          tokenReceived: Boolean(token),
+          identity: currentIdentityHex || 'anonymous',
+          tokenReceived: Boolean(token || conn.token),
         });
-        if (token && token !== api.settings.get('spacetimeToken')) {
-          api.settings.set('spacetimeToken', token);
+        const nextToken = token || conn.token;
+        if (nextToken && nextToken !== api.settings.get('spacetimeToken')) {
+          api.settings.set('spacetimeToken', nextToken);
         }
         settled = true;
         resolve(conn);
@@ -222,7 +304,8 @@ export async function getConnection() {
 
 export async function getUserObject() {
   const conn = await getConnection();
-  const identityHex = conn.identity ? conn.identity.toHexString() : 'anonymous';
+  const identityHex = getCurrentIdentityHex(conn) || 'anonymous';
+  const libraryKey = await requireLibraryKey();
 
   con.log(logScope, 'getUserObject', {
     identity: identityHex,
@@ -230,7 +313,7 @@ export async function getUserObject() {
   });
 
   return {
-    username: `${identityHex.substring(0, 12)}...`,
+    username: libraryKey || `${identityHex.substring(0, 12)}...`,
     picture: '',
     href: `https://spacetimedb.com/database/${getDatabaseName()}`,
   };
@@ -240,14 +323,14 @@ export async function getSyncList() {
   const conn = await getConnection();
   await ensureSubscribed(conn);
 
-  const owner = getCurrentIdentityHex(conn);
+  const libraryKey = await requireLibraryKey();
   const rows = [...conn.db.syncEntry.iter()] as SpaceTimeSyncRow[];
-  const ownerRows = rows.filter(row => rowOwnerHex(row) === owner);
+  const ownerRows = rows.filter(row => rowLibraryKey(row) === libraryKey);
 
   con.log(logScope, 'getSyncList', {
     totalRows: rows.length,
     ownerRows: ownerRows.length,
-    owner: owner || 'anonymous',
+    libraryKeyEnabled: Boolean(libraryKey),
   });
 
   return ownerRows
@@ -273,14 +356,10 @@ export async function getEntry(entryId: string) {
   const conn = await getConnection();
   await ensureSubscribed(conn);
 
-  if (!conn.identity) {
-    con.debug(logScope, 'getEntry:no identity');
-    return null;
-  }
+  const libraryKey = await requireLibraryKey();
 
-  const owner = getCurrentIdentityHex(conn);
-  const rows = [...conn.db.syncEntry.sync_entry_owner_id.filter(conn.identity)] as SpaceTimeSyncRow[];
-  const row = rows.find(el => el.entryId === entryId && rowOwnerHex(el) === owner);
+  const rows = [...conn.db.syncEntry.iter()] as SpaceTimeSyncRow[];
+  const row = rows.find(el => el.entryId === entryId && rowLibraryKey(el) === libraryKey);
   if (!row) {
     con.log(logScope, 'getEntry:not found', {
       entryId,
@@ -318,10 +397,12 @@ export async function upsertEntry(payload: SyncEntryPayload) {
   });
 
   const conn = await getConnection();
+  const userKey = requireLibraryKey();
 
   await conn.reducers.upsertEntry({
     entryId: payload.entryId,
     mediaType: payload.mediaType,
+    userKey,
     sourceUrl: payload.sourceUrl,
     title: payload.title,
     image: payload.image || null,
@@ -336,11 +417,16 @@ export async function upsertEntry(payload: SyncEntryPayload) {
   con.log(logScope, 'upsertEntry:done', { entryId: payload.entryId });
 }
 
-export async function deleteEntry(entryId: string) {
-  con.log(logScope, 'deleteEntry:start', { entryId });
+export async function deleteEntry(entryId: string, mediaType: 'anime' | 'manga') {
+  con.log(logScope, 'deleteEntry:start', { entryId, mediaType });
 
   const conn = await getConnection();
-  await conn.reducers.deleteEntry({ entryId });
+  const userKey = requireLibraryKey();
+  await conn.reducers.deleteEntry({
+    entryId,
+    mediaType,
+    userKey,
+  });
 
-  con.log(logScope, 'deleteEntry:done', { entryId });
+  con.log(logScope, 'deleteEntry:done', { entryId, mediaType });
 }

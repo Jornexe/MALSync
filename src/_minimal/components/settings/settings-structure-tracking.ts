@@ -11,6 +11,7 @@ import SettingsLocalSyncExport from './settings-local-sync-export.vue';
 import SettingsDisabledWebsites from './settings-disabled-websites.vue';
 import SettingsGroup from './settings-group.vue';
 import SettingsHr from './settings-hr.vue';
+import SettingsSpaceTimeProfile from './settings-spacetime-profile.vue';
 import { localStore } from '../../../utils/localStore';
 
 export const trackingSimple: ConfObj[] = [
@@ -71,6 +72,14 @@ export const trackingSimple: ConfObj[] = [
     component: SettingsGeneral,
   },
   {
+    key: 'spacetimeProfile',
+    title: () => 'SpaceTimeDB Profile',
+    condition: () =>
+      api.settings.get('syncMode') === 'SPACETIMEDB' ||
+      api.settings.get('syncModeSimkl') === 'SPACETIMEDB',
+    component: SettingsSpaceTimeProfile,
+  },
+  {
     key: 'spacetimeUri',
     title: () => 'SpaceTimeDB URI',
     condition: () =>
@@ -96,6 +105,21 @@ export const trackingSimple: ConfObj[] = [
       option: 'spacetimeDatabase',
       props: {
         validation: (value: string) => Boolean(value && value.trim().length > 0),
+      },
+    },
+    component: SettingsGeneral,
+  },
+  {
+    key: 'spacetimeToken',
+    title: () => 'SpaceTimeDB Token',
+    condition: () =>
+      api.settings.get('syncMode') === 'SPACETIMEDB' ||
+      api.settings.get('syncModeSimkl') === 'SPACETIMEDB',
+    props: {
+      component: 'input',
+      option: 'spacetimeToken',
+      props: {
+        validation: (value: string) => typeof value === 'string',
       },
     },
     component: SettingsGeneral,

@@ -27,6 +27,57 @@ function normalizeAltTitles(value: string[] | null | undefined) {
 	return [...dedupe];
 }
 
+function normalizeAliases(value: string[] | null | undefined) {
+	if (!Array.isArray(value)) return [];
+	const dedupe = new Set<string>();
+	for (const alias of value) {
+		if (!alias) continue;
+		const trimmed = alias.trim();
+		if (!trimmed) continue;
+		dedupe.add(trimmed);
+	}
+	return [...dedupe];
+}
+
+function normalizeTitleKey(value: string | null | undefined) {
+	if (!value) return '';
+	return value
+		.toLowerCase()
+		.trim()
+		.replace(/[\W_]+/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
+function mergeAltTitles(current: string[], incoming: string[]) {
+	const dedupe = new Set<string>();
+	for (const title of current) {
+		if (!title) continue;
+		dedupe.add(title);
+	}
+	for (const title of incoming) {
+		if (!title) continue;
+		dedupe.add(title);
+	}
+	return [...dedupe];
+}
+
+function hasTitleOverlap(rowTitle: string, rowAltTitles: string[], nextTitle: string, nextAltTitles: string[]) {
+	const rowTitleKeys = new Set<string>([normalizeTitleKey(rowTitle), ...rowAltTitles.map(normalizeTitleKey)].filter(Boolean));
+	const nextTitleKeys = [normalizeTitleKey(nextTitle), ...nextAltTitles.map(normalizeTitleKey)].filter(Boolean);
+
+	for (const key of nextTitleKeys) {
+		if (rowTitleKeys.has(key)) return true;
+	}
+
+	return false;
+}
+
+function preferString(current: string, incoming: string | undefined) {
+	if (incoming && incoming.trim()) return incoming;
+	return current;
+}
+
 export const upsert_entry = spacetimedb.reducer(
 	{
 		entryId: t.string(),
@@ -65,27 +116,60 @@ export const upsert_entry = spacetimedb.reducer(
 		if (!userKey) {
 			throw new SenderError('userKey is required');
 		}
-		const id = `uk:${userKey}::${params.mediaType}::${params.entryId}`;
+		const ownerRows = [...ctx.db.syncEntry.iter()].filter(
+			row => row.userKey === userKey && row.mediaType === params.mediaType,
+		);
 
-		const existing = ctx.db.syncEntry.id.find(id);
+		let existing = ownerRows.find(
+			row => row.entryId === params.entryId || normalizeAliases(row.aliases).includes(params.entryId),
+		);
+		let resolvedBy: 'id-or-alias' | 'title' | 'none' = existing ? 'id-or-alias' : 'none';
+
+		const nextAltTitles = normalizeAltTitles(params.altTitles);
+		if (!existing) {
+			existing = ownerRows.find(row =>
+				hasTitleOverlap(row.title, row.altTitles, params.title, nextAltTitles),
+			);
+			if (existing) resolvedBy = 'title';
+		}
+
+		const id = existing ? existing.id : `uk:${userKey}::${params.mediaType}::${params.entryId}`;
+
+		const isTitleFallbackLink = existing && resolvedBy === 'title';
+		const aliases = normalizeAliases([
+			...(existing?.aliases || []),
+			existing?.entryId || params.entryId,
+			params.entryId,
+		]);
 
 		const nextRow = {
 			id,
-			entryId: params.entryId,
+			entryId: existing?.entryId || params.entryId,
 			ownerId: ctx.sender,
 			userKey,
 			mediaType: params.mediaType,
-			sourceUrl: params.sourceUrl,
-			title: params.title,
-			altTitles: normalizeAltTitles(params.altTitles),
-			image: normalizeValue(params.image),
-			tags: params.tags,
-			streamingUrl: normalizeValue(params.streamingUrl),
-			progress: params.progress,
-			volumeProgress: params.volumeProgress,
-			score: params.score,
-			status: params.status,
+			sourceUrl: isTitleFallbackLink
+				? preferString(existing?.sourceUrl || '', normalizeValue(params.sourceUrl))
+				: params.sourceUrl,
+			title: isTitleFallbackLink ? preferString(existing?.title || '', params.title) : params.title,
+			altTitles: mergeAltTitles(existing?.altTitles || [], nextAltTitles),
+			image: isTitleFallbackLink
+				? normalizeValue(existing?.image) || normalizeValue(params.image)
+				: normalizeValue(params.image),
+			tags: isTitleFallbackLink
+				? preferString(existing?.tags || '', normalizeValue(params.tags))
+				: params.tags,
+			streamingUrl: isTitleFallbackLink
+				? normalizeValue(existing?.streamingUrl) || normalizeValue(params.streamingUrl)
+				: normalizeValue(params.streamingUrl),
+			progress: isTitleFallbackLink ? Math.max(existing?.progress || 0, params.progress) : params.progress,
+			volumeProgress: isTitleFallbackLink
+				? Math.max(existing?.volumeProgress || 0, params.volumeProgress)
+				: params.volumeProgress,
+			score: isTitleFallbackLink ? (params.score ? params.score : existing?.score || 0) : params.score,
+			status: isTitleFallbackLink ? existing?.status || params.status : params.status,
 			updatedAt: ctx.timestamp,
+			aliases,
 		};
 
 		if (existing) {
@@ -130,14 +214,16 @@ export const delete_entry = spacetimedb.reducer(
 
 		const allRows = [...ctx.db.syncEntry.iter()];
 		const existing = allRows.find(row => {
-			if (row.entryId !== entryId || row.mediaType !== mediaType) return false;
-			return row.userKey === normalizedUserKey;
+			if (row.mediaType !== mediaType || row.userKey !== normalizedUserKey) return false;
+			if (row.entryId === entryId) return true;
+			return normalizeAliases(row.aliases).includes(entryId);
 		});
 
 		if (!existing) {
 			console.log('[SpaceTimeDB][Server] delete_entry:miss', { entryId, mediaType });
 			return;
 		}
+
 		ctx.db.syncEntry.id.delete(existing.id);
 		console.log('[SpaceTimeDB][Server] delete_entry:done', { id: existing.id, entryId, mediaType });
 	},

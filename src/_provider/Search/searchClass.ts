@@ -516,16 +516,18 @@ export class SearchClass {
         page: this.page.database,
       };
       if (this.state.provider === 'user') {
-        if (
-          !(await utils.flashConfirm(
-            api.storage.lang('correction_DBRequest'),
-            'dbrequest',
-            () => undefined,
-            () => undefined,
-            true,
-          ))
-        )
-          return;
+        if (!api.settings.get('skipCorrectionDbRequestConfirm')) {
+          if (
+            !(await utils.flashConfirm(
+              api.storage.lang('correction_DBRequest'),
+              'dbrequest',
+              () => undefined,
+              () => undefined,
+              true,
+            ))
+          )
+            return;
+        }
         param.correction = true;
       }
 

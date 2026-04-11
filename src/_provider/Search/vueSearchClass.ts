@@ -9,6 +9,10 @@ export class SearchClass extends SearchClassExtend {
   protected vueInstance;
 
   public openCorrectionCheck() {
+    if (this.state && this.state.provider === 'user') {
+      return false;
+    }
+
     if (this.state && this.state.similarity && this.state.similarity.same) {
       con.log('similarity', this.state.similarity.value);
       return false;

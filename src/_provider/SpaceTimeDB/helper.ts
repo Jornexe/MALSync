@@ -25,6 +25,24 @@ type SpaceTimeSyncRow = {
   volumeProgress: number;
   score: number;
   status: number;
+  aliases: string[];
+  updatedAt?: unknown;
+};
+
+type SyncEntryAggregate = {
+  mediaType: string;
+  entryId: string;
+  aliases: Set<string>;
+  title: string;
+  altTitles: Set<string>;
+  tags: string;
+  streamingUrl: string;
+  image: string;
+  progress: number;
+  volumeProgress: number;
+  score: number;
+  status: number;
+  sourceUrl: string;
 };
 
 export type SyncEntryPayload = {
@@ -88,6 +106,7 @@ const syncEntryTable = table(
     status: t.u8(),
     updatedAt: t.timestamp(),
     altTitles: t.array(t.string()).default([]),
+    aliases: t.array(t.string()).default([]),
   },
 );
 
@@ -152,6 +171,91 @@ function normalizeAltTitles(value: unknown): string[] {
     dedupe.add(trimmed);
   });
   return [...dedupe];
+}
+
+function normalizeAliases(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const dedupe = new Set<string>();
+  value.forEach(el => {
+    if (typeof el !== 'string') return;
+    const trimmed = el.trim();
+    if (!trimmed) return;
+    dedupe.add(trimmed);
+  });
+  return [...dedupe];
+}
+
+function normalizeTitleKey(value: string | null | undefined): string {
+  if (!value) return '';
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[\W_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isLocalRow(row: SpaceTimeSyncRow | SyncEntryAggregate): boolean {
+  return row.entryId.startsWith('l:') || row.sourceUrl.startsWith('local://');
+}
+
+function toAggregate(row: SpaceTimeSyncRow): SyncEntryAggregate {
+  return {
+    mediaType: row.mediaType,
+    entryId: row.entryId,
+    aliases: new Set(normalizeAliases([row.entryId, ...(row.aliases || [])])),
+    title: row.title,
+    altTitles: new Set(normalizeAltTitles(row.altTitles)),
+    tags: row.tags || '',
+    streamingUrl: row.streamingUrl || '',
+    image: row.image || '',
+    progress: Number(row.progress) || 0,
+    volumeProgress: Number(row.volumeProgress) || 0,
+    score: Number(row.score) || 0,
+    status: Number(row.status) || 0,
+    sourceUrl: row.sourceUrl || '',
+  };
+}
+
+function mergeAggregate(target: SyncEntryAggregate, incoming: SpaceTimeSyncRow) {
+  normalizeAliases([incoming.entryId, ...(incoming.aliases || [])]).forEach(alias =>
+    target.aliases.add(alias),
+  );
+  normalizeAltTitles(incoming.altTitles).forEach(title => target.altTitles.add(title));
+
+  const incomingLooksRemote = !isLocalRow(incoming);
+  const targetLooksLocal = isLocalRow(target);
+  if (incomingLooksRemote && targetLooksLocal) {
+    target.entryId = incoming.entryId;
+    target.sourceUrl = incoming.sourceUrl || target.sourceUrl;
+  }
+
+  if (!target.title && incoming.title) target.title = incoming.title;
+  if (!target.tags && incoming.tags) target.tags = incoming.tags;
+  if (!target.streamingUrl && incoming.streamingUrl) target.streamingUrl = incoming.streamingUrl;
+  if (!target.image && incoming.image) target.image = incoming.image;
+
+  target.progress = Math.max(target.progress, Number(incoming.progress) || 0);
+  target.volumeProgress = Math.max(target.volumeProgress, Number(incoming.volumeProgress) || 0);
+  target.score = Math.max(target.score, Number(incoming.score) || 0);
+}
+
+function overlapsByIds(target: SyncEntryAggregate, row: SpaceTimeSyncRow): boolean {
+  const ids = normalizeAliases([row.entryId, ...(row.aliases || [])]);
+  return ids.some(id => target.aliases.has(id));
+}
+
+function overlapsByTitle(target: SyncEntryAggregate, row: SpaceTimeSyncRow): boolean {
+  const targetKeys = new Set<string>([
+    normalizeTitleKey(target.title),
+    ...[...target.altTitles].map(el => normalizeTitleKey(el)),
+  ].filter(Boolean));
+  const rowKeys = [
+    normalizeTitleKey(row.title),
+    ...normalizeAltTitles(row.altTitles).map(el => normalizeTitleKey(el)),
+  ].filter(Boolean);
+
+  return rowKeys.some(key => targetKeys.has(key));
 }
 
 function getLibraryKey() {
@@ -349,14 +453,30 @@ export async function getSyncList() {
     libraryKeyEnabled: Boolean(libraryKey),
   });
 
-  return ownerRows
+  const deduped: SyncEntryAggregate[] = [];
+  ownerRows.forEach(row => {
+    const match = deduped.find(
+      candidate =>
+        candidate.mediaType === row.mediaType &&
+        (overlapsByIds(candidate, row) || overlapsByTitle(candidate, row)),
+    );
+
+    if (!match) {
+      deduped.push(toAggregate(row));
+      return;
+    }
+
+    mergeAggregate(match, row);
+  });
+
+  return deduped
     .reduce((acc, row) => {
       acc[`stdb://${row.mediaType}/${encodeURIComponent(row.entryId)}`] = {
         name: row.title,
-        altTitles: normalizeAltTitles(row.altTitles),
+        altTitles: normalizeAltTitles([...row.altTitles]),
         tags: row.tags,
-        sUrl: row.streamingUrl || '',
-        image: row.image || '',
+        sUrl: row.streamingUrl,
+        image: row.image,
         progress: row.progress,
         volumeprogress: row.volumeProgress,
         score: row.score,
@@ -367,8 +487,12 @@ export async function getSyncList() {
     }, {} as Record<string, any>);
 }
 
-export async function getEntry(entryId: string) {
-  con.log(logScope, 'getEntry:start', { entryId });
+export async function getEntry(
+  entryId: string,
+  mediaType: 'anime' | 'manga',
+  titleHint?: string,
+) {
+  con.log(logScope, 'getEntry:start', { entryId, mediaType, hasTitleHint: Boolean(titleHint) });
 
   const conn = await getConnection();
   await ensureSubscribed(conn);
@@ -376,18 +500,52 @@ export async function getEntry(entryId: string) {
   const libraryKey = await requireLibraryKey();
 
   const rows = [...conn.db.syncEntry.iter()] as SpaceTimeSyncRow[];
-  const row = rows.find(el => el.entryId === entryId && rowLibraryKey(el) === libraryKey);
+  const ownerRows = rows.filter(row => rowLibraryKey(row) === libraryKey && row.mediaType === mediaType);
+
+  let row = ownerRows.find(el => el.entryId === entryId);
+  if (!row) {
+    row = ownerRows.find(candidate => normalizeAliases(candidate.aliases).includes(entryId));
+  }
+
+  if (!row) {
+    const entryIdTitleHint = normalizeTitleKey(entryId.replace(/^l:[^:]+::/i, ''));
+    if (entryIdTitleHint) {
+      row = ownerRows.find(candidate => {
+        const titleKeys = [
+          normalizeTitleKey(candidate.title),
+          ...normalizeAltTitles(candidate.altTitles).map(el => normalizeTitleKey(el)),
+        ].filter(Boolean);
+        return titleKeys.includes(entryIdTitleHint);
+      });
+    }
+  }
+
+  if (!row && titleHint) {
+    const normalizedTitleHint = normalizeTitleKey(titleHint);
+    if (normalizedTitleHint) {
+      row = ownerRows.find(candidate => {
+        const titleKeys = [
+          normalizeTitleKey(candidate.title),
+          ...normalizeAltTitles(candidate.altTitles).map(el => normalizeTitleKey(el)),
+        ].filter(Boolean);
+        return titleKeys.includes(normalizedTitleHint);
+      });
+    }
+  }
+
   if (!row) {
     con.log(logScope, 'getEntry:not found', {
       entryId,
-      ownerRows: rows.length,
+      mediaType,
+      ownerRows: ownerRows.length,
     });
     return null;
   }
 
   con.log(logScope, 'getEntry:hit', {
     entryId,
-    ownerRows: rows.length,
+    mediaType,
+    ownerRows: ownerRows.length,
   });
 
   return {

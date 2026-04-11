@@ -219,7 +219,7 @@ export class Single extends SingleAbstract {
     });
 
     this._authenticated = true;
-    this.animeInfo = await helper.getEntry(this.entryId);
+    this.animeInfo = await helper.getEntry(this.entryId, this.getType()!, this.getTitleFromUrl());
 
     this._onList = true;
 

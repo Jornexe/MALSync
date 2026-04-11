@@ -768,6 +768,7 @@ export class SyncPage {
       j.$('.MalLogin').css('display', 'none');
       j.$('#MalData').css('display', 'flex');
       j.$('#MalInfo').text('');
+      j.$('.malp-group-stdb-actions').css('display', 'none');
       j.$('#malRating').after(
         j.html(
           `&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span id='LoginMalDiv'>${this.singleObj.getLastErrorMessage()}</span>`,
@@ -793,6 +794,7 @@ export class SyncPage {
     });
 
     if (!this.singleObj.isOnList()) {
+      j.$('.malp-group-stdb-actions').css('display', 'none');
       j.$('.MalLogin').css('display', 'none');
       j.$('#malRating').after(
         j.html(
@@ -849,6 +851,9 @@ export class SyncPage {
 
       j.$('#malStatus').val(this.singleObj.getStatusCheckboxValue());
       j.$('#malUserRating').val(this.singleObj.getScoreCheckboxValue());
+
+      const showSpaceTimeDbActions = this.singleObj.shortName === 'SpaceTimeDB';
+      j.$('.malp-group-stdb-actions').css('display', showSpaceTimeDbActions ? '' : 'none');
     }
     j.$('#MalData').css('display', 'flex');
     j.$('#MalInfo').text('');
@@ -1004,6 +1009,8 @@ export class SyncPage {
 
   protected imageFallbackInterval: NodeJS.Timeout | undefined = undefined;
 
+  protected lastResolvedImageFallback: string | undefined = undefined;
+
   imageFallback(state: pageState) {
     clearInterval(this.imageFallbackInterval);
     if (
@@ -1029,6 +1036,7 @@ export class SyncPage {
 
       if (image) {
         con.log('Image Fallback', image);
+        this.lastResolvedImageFallback = image;
         clearInterval(this.imageFallbackInterval);
         this.singleObj.setImage(image);
       }
@@ -1157,6 +1165,13 @@ export class SyncPage {
     ui += '</select>';
     ui += wrapEnd;
 
+    ui += wrapStart('stdb-actions');
+    ui +=
+      '<a href="#" id="malUpdateReadingUrl" class="malp-group-field" onclick="return false;">Update reading URL</a>';
+    ui +=
+      '<a href="#" id="malUpdateImage" class="malp-group-field" onclick="return false;" style="margin-left: 10px;">Update image</a>';
+    ui += wrapEnd;
+
     // ui += '</span>';
     ui += '</span>';
     ui += '</p>';
@@ -1174,6 +1189,16 @@ export class SyncPage {
       // @ts-ignore
       const el = j.$(this);
       This.calcSelectWidth(el);
+    });
+
+    j.$('#malUpdateReadingUrl').click(async function (event) {
+      event.preventDefault();
+      await This.updateReadingUrl();
+    });
+
+    j.$('#malUpdateImage').click(async function (event) {
+      event.preventDefault();
+      await This.updateImage();
     });
 
     j.$('#malEpisodes, #malVolumes')
@@ -1231,6 +1256,55 @@ export class SyncPage {
       .then(() => {
         this.fillUI();
       });
+  }
+
+  private async updateReadingUrl() {
+    if (!this.singleObj || this.singleObj.shortName !== 'SpaceTimeDB' || !this.singleObj.isOnList()) {
+      return;
+    }
+
+    this.singleObj.setStreamingUrl(this.url);
+    await this.singleObj.sync();
+    await this.singleObj.update();
+    this.fillUI();
+    utils.flashm('Reading URL updated.', {
+      success: true,
+      type: 'stdb-reading-url-updated',
+    });
+  }
+
+  private async updateImage() {
+    if (!this.singleObj || this.singleObj.shortName !== 'SpaceTimeDB' || !this.singleObj.isOnList()) {
+      return;
+    }
+
+    let pageImage: string | undefined = this.lastResolvedImageFallback;
+    if (!pageImage && this.page.sync?.getImage && this.curState?.on === 'SYNC') {
+      pageImage = this.page.sync.getImage();
+    }
+    if (!pageImage && this.page.overview?.getImage && this.curState?.on === 'OVERVIEW') {
+      pageImage = this.page.overview.getImage();
+    }
+    if (!pageImage && typeof this.page.getImage === 'function') {
+      pageImage = await this.page.getImage();
+    }
+
+    if (!pageImage || typeof this.singleObj.setImage !== 'function') {
+      utils.flashm('No image could be detected on this page.', {
+        error: true,
+        type: 'error',
+      });
+      return;
+    }
+
+    this.singleObj.setImage(pageImage);
+    await this.singleObj.sync();
+    await this.singleObj.update();
+    this.fillUI();
+    utils.flashm('Poster image updated.', {
+      success: true,
+      type: 'stdb-image-updated',
+    });
   }
 
   private browsingtime: number | undefined = Date.now();

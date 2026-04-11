@@ -1059,6 +1059,10 @@
         "message": "Remap floating button to the correction UI",
         "description": "Remap floating button to the correction UI"
     },
+    "settings_skipCorrectionDbRequestConfirm": {
+        "message": "Skip \"Submit database correction request?\" prompt",
+        "description": "When enabled, manual corrections are submitted without an extra confirmation popup"
+    },
     "settings_miniMAL_floatButtonHide": {
         "message": "Hide miniMAL floating menu button",
         "description": "Hide miniMAL floating menu button"

@@ -540,6 +540,7 @@ export function flashm(
   text,
   options?: {
     error?: boolean;
+    success?: boolean;
     type?: string;
     permanent?: boolean;
     hoverInfo?: boolean;
@@ -555,6 +556,12 @@ export function flashm(
   let colorF = '#323232';
   if (typeof options !== 'undefined' && typeof options.error !== 'undefined' && options.error) {
     colorF = '#3e0808';
+  } else if (
+    typeof options !== 'undefined' &&
+    typeof options.success !== 'undefined' &&
+    options.success
+  ) {
+    colorF = '#0c3a18';
   }
 
   let flashdiv = '#flash-div-bottom';

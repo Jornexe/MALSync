@@ -42,6 +42,7 @@ export const SyncEntry = table(
 		status: t.u8(),
 		updatedAt: t.timestamp(),
 		altTitles: t.array(t.string()).default([]),
+		aliases: t.array(t.string()).default([]),
 	},
 );
 

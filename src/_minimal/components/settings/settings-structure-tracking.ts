@@ -277,6 +277,15 @@ export const tracking: ConfObj[] = [
     component: SettingsGeneral,
   },
   {
+    key: 'skipCorrectionDbRequestConfirm',
+    title: () => api.storage.lang('settings_skipCorrectionDbRequestConfirm'),
+    props: {
+      component: 'checkbox',
+      option: 'skipCorrectionDbRequestConfirm',
+    },
+    component: SettingsGeneral,
+  },
+  {
     key: 'hr',
     title: '',
     component: SettingsHr,

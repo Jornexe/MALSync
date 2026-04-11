@@ -83,6 +83,7 @@ export const settingsObj = {
     nextEpShort: [],
     correctionShort: [67],
     syncShort: [],
+    skipCorrectionDbRequestConfirm: false,
 
     progressInterval: 120,
     progressIntervalDefaultAnime: 'en/sub',

@@ -4,7 +4,7 @@
   "author": "lolamtisch@gmail.com",
   "license": "GPL-3.0-only",
   "repository": "github:MALSync/MALSync",
-  "version": "0.12.3",
+  "version": "0.14.0",
   "description": "Integrates MyAnimeList/AniList/Kitsu/Simkl into various sites, with auto episode tracking.",
   "engines": {
     "npm": ">=8.0.0",
@@ -48,6 +48,7 @@
     "mkdirp": "^1.0.4",
     "mocha": "^11.7.5",
     "node-dir": "^0.1.17",
+    "patch-package": "^8.0.1",
     "postcss-html": "^1.8.1",
     "postcss-less": "^6.0.0",
     "prettier": "^3.8.1",
@@ -113,7 +114,8 @@
     "lint:less:ci": "stylelint src/**/*.{css,less,vue} -q",
     "lint:vue": "vue-tsc --noEmit",
     "lint:fix": "npm run lint:script:fix && npm run lint:less:fix",
-    "lint:ci": "npm run lint:less:ci && npm run lint:script:ci && npm run lint:vue"
+    "lint:ci": "npm run lint:less:ci && npm run lint:script:ci && npm run lint:vue",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@popperjs/core": "^2.11.8",

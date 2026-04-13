@@ -1,0 +1,212 @@
+diff --git a/node_modules/spacetimedb/dist/index.browser.mjs b/node_modules/spacetimedb/dist/index.browser.mjs
+index 78f714e..c099037 100644
+--- a/node_modules/spacetimedb/dist/index.browser.mjs
++++ b/node_modules/spacetimedb/dist/index.browser.mjs
+@@ -1172,34 +1172,16 @@ var ProductType = {
+   makeSerializer(ty, typespace) {
+     let serializer = SERIALIZERS.get(ty);
+     if (serializer != null) return serializer;
+-    if (isFixedSizeProduct(ty)) {
+-      const size = productSize(ty);
+-      const body2 = `"use strict";
+-writer.expandBuffer(${size});
+-const view = writer.view;
+-${ty.elements.map(
+-        ({ name, algebraicType: { tag } }) => tag in primitiveJSName ? `view.set${primitiveJSName[tag]}(writer.offset, value.${name}, ${primitiveSizes[tag] > 1 ? "true" : ""});
+-writer.offset += ${primitiveSizes[tag]};` : `writer.write${tag}(value.${name});`
+-      ).join("\n")}`;
+-      serializer = Function("writer", "value", body2);
+-      SERIALIZERS.set(ty, serializer);
+-      return serializer;
+-    }
+-    const serializers = {};
+-    const body = '"use strict";\n' + ty.elements.map(
+-      (element) => `this.${element.name}(writer, value.${element.name});`
+-    ).join("\n");
+-    serializer = Function("writer", "value", body).bind(
+-      serializers
+-    );
++    const serializers = ty.elements.map(({ name, algebraicType }) => ({
++      name,
++      serialize: AlgebraicType.makeSerializer(algebraicType, typespace)
++    }));
++    serializer = (writer, value) => {
++      for (const element of serializers) {
++        element.serialize(writer, value[element.name]);
++      }
++    };
+     SERIALIZERS.set(ty, serializer);
+-    for (const { name, algebraicType } of ty.elements) {
+-      serializers[name] = AlgebraicType.makeSerializer(
+-        algebraicType,
+-        typespace
+-      );
+-    }
+-    Object.freeze(serializers);
+     return serializer;
+   },
+   /** @deprecated Use `makeSerializer` instead. */
+@@ -1218,36 +1200,18 @@ writer.offset += ${primitiveSizes[tag]};` : `writer.write${tag}(value.${name});`
+     }
+     let deserializer = DESERIALIZERS.get(ty);
+     if (deserializer != null) return deserializer;
+-    if (isFixedSizeProduct(ty)) {
+-      const body = `"use strict";
+-const result = { ${ty.elements.map(getElementInitializer).join(", ")} };
+-const view = reader.view;
+-${ty.elements.map(
+-        ({ name, algebraicType: { tag } }) => tag in primitiveJSName ? tag === "Bool" ? `result.${name} = view.getUint8(reader.offset) !== 0;
+-reader.offset += 1;` : `result.${name} = view.get${primitiveJSName[tag]}(reader.offset, ${primitiveSizes[tag] > 1 ? "true" : ""});
+-reader.offset += ${primitiveSizes[tag]};` : `result.${name} = reader.read${tag}();`
+-      ).join("\n")}
+-return result;`;
+-      deserializer = Function("reader", body);
+-      DESERIALIZERS.set(ty, deserializer);
+-      return deserializer;
+-    }
+-    const deserializers = {};
+-    deserializer = Function(
+-      "reader",
+-      `"use strict";
+-const result = { ${ty.elements.map(getElementInitializer).join(", ")} };
+-${ty.elements.map(({ name }) => `result.${name} = this.${name}(reader);`).join("\n")}
+-return result;`
+-    ).bind(deserializers);
++    const deserializers = ty.elements.map(({ name, algebraicType }) => ({
++      name,
++      deserialize: AlgebraicType.makeDeserializer(algebraicType, typespace)
++    }));
++    deserializer = (reader) => {
++      const result = {};
++      for (const element of deserializers) {
++        result[element.name] = element.deserialize(reader);
++      }
++      return result;
++    };
+     DESERIALIZERS.set(ty, deserializer);
+-    for (const { name, algebraicType } of ty.elements) {
+-      deserializers[name] = AlgebraicType.makeDeserializer(
+-        algebraicType,
+-        typespace
+-      );
+-    }
+-    Object.freeze(deserializers);
+     return deserializer;
+   },
+   /** @deprecated Use `makeDeserializer` instead. */
+@@ -1306,30 +1270,22 @@ var SumType = {
+     } else {
+       let serializer = SERIALIZERS.get(ty);
+       if (serializer != null) return serializer;
+-      const serializers = {};
+-      const body = `switch (value.tag) {
+-${ty.variants.map(
+-        ({ name }, i) => `  case ${JSON.stringify(name)}:
+-    writer.writeByte(${i});
+-    return this.${name}(writer, value.value);`
+-      ).join("\n")}
+-  default:
+-    throw new TypeError(
+-      \`Could not serialize sum type; unknown tag \${value.tag}\`
+-    )
+-}
+-`;
+-      serializer = Function("writer", "value", body).bind(
+-        serializers
+-      );
++      const serializers = ty.variants.map(({ name, algebraicType }) => ({
++        name,
++        serialize: AlgebraicType.makeSerializer(algebraicType, typespace)
++      }));
++      serializer = (writer, value) => {
++        for (let i = 0; i < serializers.length; i++) {
++          const variant = serializers[i];
++          if (value.tag === variant.name) {
++            writer.writeByte(i);
++            variant.serialize(writer, value.value);
++            return;
++          }
++        }
++        throw new TypeError(`Could not serialize sum type; unknown tag ${value.tag}`);
++      };
+       SERIALIZERS.set(ty, serializer);
+-      for (const { name, algebraicType } of ty.variants) {
+-        serializers[name] = AlgebraicType.makeSerializer(
+-          algebraicType,
+-          typespace
+-        );
+-      }
+-      Object.freeze(serializers);
+       return serializer;
+     }
+   },
+@@ -1375,22 +1331,19 @@ ${ty.variants.map(
+     } else {
+       let deserializer = DESERIALIZERS.get(ty);
+       if (deserializer != null) return deserializer;
+-      const deserializers = {};
+-      deserializer = Function(
+-        "reader",
+-        `switch (reader.readU8()) {
+-${ty.variants.map(
+-          ({ name }, i) => `case ${i}: return { tag: ${JSON.stringify(name)}, value: this.${name}(reader) };`
+-        ).join("\n")} }`
+-      ).bind(deserializers);
++      const deserializers = ty.variants.map(({ name, algebraicType }) => ({
++        name,
++        deserialize: AlgebraicType.makeDeserializer(algebraicType, typespace)
++      }));
++      deserializer = (reader) => {
++        const tagIndex = reader.readU8();
++        const variant = deserializers[tagIndex];
++        if (!variant) {
++          throw new TypeError(`Could not deserialize sum type; unknown tag ${tagIndex}`);
++        }
++        return { tag: variant.name, value: variant.deserialize(reader) };
++      };
+       DESERIALIZERS.set(ty, deserializer);
+-      for (const { name, algebraicType } of ty.variants) {
+-        deserializers[name] = AlgebraicType.makeDeserializer(
+-          algebraicType,
+-          typespace
+-        );
+-      }
+-      Object.freeze(deserializers);
+       return deserializer;
+     }
+   },
+@@ -5020,7 +4973,7 @@ async function resolveWS() {
+   if (typeof globalThis.WebSocket !== "undefined") {
+     return globalThis.WebSocket;
+   }
+-  const dynamicImport = new Function("m", "return import(m)");
++  const dynamicImport = (m) => import(m);
+   try {
+     const { WebSocket: UndiciWS } = await dynamicImport("undici");
+     return UndiciWS;
+diff --git a/node_modules/spacetimedb/dist/index.cjs b/node_modules/spacetimedb/dist/index.cjs
+index e39bc17..99933fe 100644
+--- a/node_modules/spacetimedb/dist/index.cjs
++++ b/node_modules/spacetimedb/dist/index.cjs
+@@ -5022,7 +5022,7 @@ async function resolveWS() {
+   if (typeof globalThis.WebSocket !== "undefined") {
+     return globalThis.WebSocket;
+   }
+-  const dynamicImport = new Function("m", "return import(m)");
++  const dynamicImport = (m) => import(m);
+   try {
+     const { WebSocket: UndiciWS } = await dynamicImport("undici");
+     return UndiciWS;
+diff --git a/node_modules/spacetimedb/dist/index.mjs b/node_modules/spacetimedb/dist/index.mjs
+index 15ab6ce..5d8bdbf 100644
+--- a/node_modules/spacetimedb/dist/index.mjs
++++ b/node_modules/spacetimedb/dist/index.mjs
+@@ -5020,7 +5020,7 @@ async function resolveWS() {
+   if (typeof globalThis.WebSocket !== "undefined") {
+     return globalThis.WebSocket;
+   }
+-  const dynamicImport = new Function("m", "return import(m)");
++  const dynamicImport = (m) => import(m);
+   try {
+     const { WebSocket: UndiciWS } = await dynamicImport("undici");
+     return UndiciWS;

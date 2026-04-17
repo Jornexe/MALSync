@@ -12,7 +12,8 @@ import { UserList as SpaceTimeDbList } from './SpaceTimeDB/list';
 
 export async function getList(...args) {
   let tempList: listElement[] = [];
-  if (api.settings.get('localSync')) {
+  const syncMode = helper.getSyncMode(args[1] ? args[1] : 'anime');
+  if (api.settings.get('localSync') && syncMode !== 'SPACETIMEDB') {
     const [status, listType] = args;
     const localListEl = new LocalList(status, listType);
     localListEl.modes.initProgress = true;

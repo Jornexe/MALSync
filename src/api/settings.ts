@@ -128,6 +128,8 @@ export const settingsObj = {
     spacetimeUserKey: '',
     spacetimeProfileLastConfirmed: 'profile1',
     spacetimeProfileConfirmSkip: false,
+    spacetimeTitleMergeAutomation: 'on',
+    spacetimeTitleMergeStrictness: 'fuzzy',
 
     shikiToken: '',
     shikiOptions: {

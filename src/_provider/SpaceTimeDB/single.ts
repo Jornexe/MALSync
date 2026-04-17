@@ -161,8 +161,7 @@ export class Single extends SingleAbstract {
   }
 
   _getTitle(raw = false) {
-    if (raw) return this.animeInfo.name;
-    return `[SDB] ${this.animeInfo.name}`;
+    return this.animeInfo.name;
   }
 
   _getTotalEpisodes() {

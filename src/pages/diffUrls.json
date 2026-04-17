@@ -157,5 +157,10 @@
       "*://jessicaclearout.com/e/*",
       "*://megaup.nl/e/*"
     ]
+  },
+  "0.14.0": {
+    "Zoro": [
+      "*://9animetv.to/*"
+    ]
   }
 }

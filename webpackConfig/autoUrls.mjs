@@ -46,6 +46,7 @@ async function zoro() {
   for (const url of urls) {
     formattedUrls.push('*://' + url.hostname + '/*');
   }
+  formattedUrls.push('*://9animetv.to/*');
   addPageUrls('Zoro', formattedUrls);
 }
 

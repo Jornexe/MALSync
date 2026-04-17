@@ -49,6 +49,22 @@ function normalizeTitleKey(value: string | null | undefined) {
 		.trim();
 }
 
+function hasStrongTitleContainment(a: string, b: string) {
+	if (!a || !b) return false;
+	const shorter = a.length <= b.length ? a : b;
+	const longer = a.length <= b.length ? b : a;
+
+	// Guard against generic matches like "the" or "one piece" fragments.
+	if (shorter.length < 10) return false;
+
+	return longer.includes(shorter);
+}
+
+function hasTitleMatch(rowKey: string, nextKey: string, mode: 'exact' | 'fuzzy') {
+	if (mode === 'exact') return rowKey === nextKey;
+	return rowKey === nextKey || hasStrongTitleContainment(rowKey, nextKey);
+}
+
 function mergeAltTitles(current: string[], incoming: string[]) {
 	const dedupe = new Set<string>();
 	for (const title of current) {
@@ -62,12 +78,22 @@ function mergeAltTitles(current: string[], incoming: string[]) {
 	return [...dedupe];
 }
 
-function hasTitleOverlap(rowTitle: string, rowAltTitles: string[], nextTitle: string, nextAltTitles: string[]) {
+function hasTitleOverlap(
+	rowTitle: string,
+	rowAltTitles: string[],
+	nextTitle: string,
+	nextAltTitles: string[],
+	mode: 'off' | 'exact' | 'fuzzy',
+) {
+	if (mode === 'off') return false;
+
 	const rowTitleKeys = new Set<string>([normalizeTitleKey(rowTitle), ...rowAltTitles.map(normalizeTitleKey)].filter(Boolean));
 	const nextTitleKeys = [normalizeTitleKey(nextTitle), ...nextAltTitles.map(normalizeTitleKey)].filter(Boolean);
 
-	for (const key of nextTitleKeys) {
-		if (rowTitleKeys.has(key)) return true;
+	for (const rowKey of rowTitleKeys) {
+		for (const nextKey of nextTitleKeys) {
+			if (hasTitleMatch(rowKey, nextKey, mode)) return true;
+		}
 	}
 
 	return false;
@@ -83,6 +109,7 @@ export const upsert_entry = spacetimedb.reducer(
 		entryId: t.string(),
 		mediaType: t.string(),
 		userKey: t.string(),
+		titleMergeMode: t.string().optional(),
 		sourceUrl: t.string(),
 		title: t.string(),
 		altTitles: t.array(t.string()).optional(),
@@ -95,10 +122,18 @@ export const upsert_entry = spacetimedb.reducer(
 		status: t.u8(),
 	},
 	(ctx, params) => {
+		const titleMergeMode =
+			params.titleMergeMode === 'off' ||
+			params.titleMergeMode === 'exact' ||
+			params.titleMergeMode === 'fuzzy'
+				? params.titleMergeMode
+				: 'fuzzy';
+
 		console.log('[SpaceTimeDB][Server] upsert_entry:start', {
 			sender: ctx.sender.toHexString(),
 			entryId: params.entryId,
 			mediaType: params.mediaType,
+			titleMergeMode,
 			progress: params.progress,
 			volumeProgress: params.volumeProgress,
 			score: params.score,
@@ -128,7 +163,7 @@ export const upsert_entry = spacetimedb.reducer(
 		const nextAltTitles = normalizeAltTitles(params.altTitles);
 		if (!existing) {
 			existing = ownerRows.find(row =>
-				hasTitleOverlap(row.title, row.altTitles, params.title, nextAltTitles),
+				hasTitleOverlap(row.title, row.altTitles, params.title, nextAltTitles, titleMergeMode),
 			);
 			if (existing) resolvedBy = 'title';
 		}

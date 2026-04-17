@@ -48,6 +48,7 @@ type SyncEntryAggregate = {
 export type SyncEntryPayload = {
   entryId: string;
   mediaType: 'anime' | 'manga';
+  titleMergeMode?: 'off' | 'exact' | 'fuzzy';
   sourceUrl: string;
   title: string;
   altTitles?: string[];
@@ -117,6 +118,7 @@ const remoteModule = {
       entryId: t.string(),
       mediaType: t.string(),
       userKey: t.string(),
+      titleMergeMode: t.string().optional(),
       sourceUrl: t.string(),
       title: t.string(),
       altTitles: t.array(t.string()).optional(),
@@ -195,6 +197,32 @@ function normalizeTitleKey(value: string | null | undefined): string {
     .trim();
 }
 
+function hasStrongTitleContainment(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const shorter = a.length <= b.length ? a : b;
+  const longer = a.length <= b.length ? b : a;
+
+  if (shorter.length < 10) return false;
+
+  return longer.includes(shorter);
+}
+
+function isExactTitleMatch(targetKey: string, rowKey: string): boolean {
+  return Boolean(targetKey) && Boolean(rowKey) && targetKey === rowKey;
+}
+
+function isFuzzyTitleMatch(targetKey: string, rowKey: string): boolean {
+  return (
+    isExactTitleMatch(targetKey, rowKey) ||
+    hasStrongTitleContainment(targetKey, rowKey)
+  );
+}
+
+function getTitleMergeMode(): 'off' | 'exact' | 'fuzzy' {
+  if (api.settings.get('spacetimeTitleMergeAutomation') !== 'on') return 'off';
+  return api.settings.get('spacetimeTitleMergeStrictness') === 'exact' ? 'exact' : 'fuzzy';
+}
+
 function isLocalRow(row: SpaceTimeSyncRow | SyncEntryAggregate): boolean {
   return row.entryId.startsWith('l:') || row.sourceUrl.startsWith('local://');
 }
@@ -245,7 +273,13 @@ function overlapsByIds(target: SyncEntryAggregate, row: SpaceTimeSyncRow): boole
   return ids.some(id => target.aliases.has(id));
 }
 
-function overlapsByTitle(target: SyncEntryAggregate, row: SpaceTimeSyncRow): boolean {
+function overlapsByTitle(
+  target: SyncEntryAggregate,
+  row: SpaceTimeSyncRow,
+  titleMergeMode: 'off' | 'exact' | 'fuzzy',
+): boolean {
+  if (titleMergeMode === 'off') return false;
+
   const targetKeys = new Set<string>([
     normalizeTitleKey(target.title),
     ...[...target.altTitles].map(el => normalizeTitleKey(el)),
@@ -255,7 +289,12 @@ function overlapsByTitle(target: SyncEntryAggregate, row: SpaceTimeSyncRow): boo
     ...normalizeAltTitles(row.altTitles).map(el => normalizeTitleKey(el)),
   ].filter(Boolean);
 
-  return rowKeys.some(key => targetKeys.has(key));
+  return rowKeys.some(rowKey => {
+    return [...targetKeys].some(targetKey => {
+      if (titleMergeMode === 'exact') return isExactTitleMatch(targetKey, rowKey);
+      return isFuzzyTitleMatch(targetKey, rowKey);
+    });
+  });
 }
 
 function getLibraryKey() {
@@ -442,6 +481,7 @@ export async function getUserObject() {
 export async function getSyncList() {
   const conn = await getConnection();
   await ensureSubscribed(conn);
+  const titleMergeMode = getTitleMergeMode();
 
   const libraryKey = await requireLibraryKey();
   const rows = [...conn.db.syncEntry.iter()] as SpaceTimeSyncRow[];
@@ -458,7 +498,7 @@ export async function getSyncList() {
     const match = deduped.find(
       candidate =>
         candidate.mediaType === row.mediaType &&
-        (overlapsByIds(candidate, row) || overlapsByTitle(candidate, row)),
+        (overlapsByIds(candidate, row) || overlapsByTitle(candidate, row, titleMergeMode)),
     );
 
     if (!match) {
@@ -501,13 +541,14 @@ export async function getEntry(
 
   const rows = [...conn.db.syncEntry.iter()] as SpaceTimeSyncRow[];
   const ownerRows = rows.filter(row => rowLibraryKey(row) === libraryKey && row.mediaType === mediaType);
+  const titleMergeMode = getTitleMergeMode();
 
   let row = ownerRows.find(el => el.entryId === entryId);
   if (!row) {
     row = ownerRows.find(candidate => normalizeAliases(candidate.aliases).includes(entryId));
   }
 
-  if (!row) {
+  if (!row && titleMergeMode !== 'off') {
     const entryIdTitleHint = normalizeTitleKey(entryId.replace(/^l:[^:]+::/i, ''));
     if (entryIdTitleHint) {
       row = ownerRows.find(candidate => {
@@ -515,12 +556,13 @@ export async function getEntry(
           normalizeTitleKey(candidate.title),
           ...normalizeAltTitles(candidate.altTitles).map(el => normalizeTitleKey(el)),
         ].filter(Boolean);
-        return titleKeys.includes(entryIdTitleHint);
+        if (titleMergeMode === 'exact') return titleKeys.includes(entryIdTitleHint);
+        return titleKeys.some(titleKey => isFuzzyTitleMatch(titleKey, entryIdTitleHint));
       });
     }
   }
 
-  if (!row && titleHint) {
+  if (!row && titleHint && titleMergeMode !== 'off') {
     const normalizedTitleHint = normalizeTitleKey(titleHint);
     if (normalizedTitleHint) {
       row = ownerRows.find(candidate => {
@@ -528,7 +570,8 @@ export async function getEntry(
           normalizeTitleKey(candidate.title),
           ...normalizeAltTitles(candidate.altTitles).map(el => normalizeTitleKey(el)),
         ].filter(Boolean);
-        return titleKeys.includes(normalizedTitleHint);
+        if (titleMergeMode === 'exact') return titleKeys.includes(normalizedTitleHint);
+        return titleKeys.some(titleKey => isFuzzyTitleMatch(titleKey, normalizedTitleHint));
       });
     }
   }
@@ -574,11 +617,13 @@ export async function upsertEntry(payload: SyncEntryPayload) {
 
   const conn = await getConnection();
   const userKey = requireLibraryKey();
+  const titleMergeMode = payload.titleMergeMode || getTitleMergeMode();
 
   await conn.reducers.upsertEntry({
     entryId: payload.entryId,
     mediaType: payload.mediaType,
     userKey,
+    titleMergeMode,
     sourceUrl: payload.sourceUrl,
     title: payload.title,
     altTitles: normalizeAltTitles(payload.altTitles),

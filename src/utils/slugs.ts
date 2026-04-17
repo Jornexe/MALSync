@@ -15,7 +15,7 @@ const simklRegex = /^https:\/\/simkl\.com\/(anime|manga)\/(\d+)(\/|$)/;
 const shikiRegex = /^https:\/\/shikimori\.one\/(animes|mangas|ranobe)\/\D?(\d+)/;
 const mangabakaRegex = /^https:\/\/mangabaka\.(?:dev|org)\/(\d+)(\/|$)/;
 const localRegex = /^local:\/\/([^/]+)\/(anime|manga)\/([^/]+)(\/|$)/;
-const spaceTimeDbRegex = /^stdb:\/\/(anime|manga)\/([^/]+)(\/|$)/;
+const spaceTimeDbRegex = /^stdb:\/\/(anime|manga)\/([^/]+)(?:\/([^/]*))?(\/|$)?/;
 
 export function urlToSlug(url: string): slugObject {
   const obj: slugObject = {
@@ -88,9 +88,11 @@ export function urlToSlug(url: string): slugObject {
 
   const spaceTimeDbMatch = url.match(spaceTimeDbRegex);
   if (spaceTimeDbMatch) {
+    const stdbEntryId = decodeURIComponent(spaceTimeDbMatch[2]);
+    const stdbTitle = spaceTimeDbMatch[3] ? decodeURIComponent(spaceTimeDbMatch[3]) : '';
     obj.path = {
       type: spaceTimeDbMatch[1] as 'anime' | 'manga',
-      slug: `stdb:${decodeURIComponent(spaceTimeDbMatch[2])}`,
+      slug: stdbTitle ? `stdb:${stdbEntryId}:${encodeURIComponent(stdbTitle)}` : `stdb:${stdbEntryId}`,
     };
     obj.url = '';
     return obj;
@@ -125,7 +127,14 @@ export function pathToUrl(path: Path): string {
     }
   }
   if (path.slug.startsWith('stdb:')) {
-    return `stdb://${path.type}/${encodeURIComponent(path.slug.substring(5))}`;
+    const stdbRest = path.slug.substring(5);
+    const stdbColonIdx = stdbRest.indexOf(':');
+    if (stdbColonIdx !== -1) {
+      const stdbEntryId = stdbRest.substring(0, stdbColonIdx);
+      const stdbTitle = stdbRest.substring(stdbColonIdx + 1);
+      return `stdb://${path.type}/${encodeURIComponent(stdbEntryId)}/${stdbTitle}`;
+    }
+    return `stdb://${path.type}/${encodeURIComponent(stdbRest)}`;
   }
 
   throw new Error('Unknown Path Object');

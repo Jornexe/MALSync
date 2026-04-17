@@ -7,6 +7,7 @@ import { MetaOverview as KitsuMeta } from './Kitsu/metaOverview';
 import { MetaOverview as MangaBakaMeta } from './MangaBaka/metaOverview';
 import { MetaOverview as SimklMeta } from './Simkl/metaOverview';
 import { MetaOverview as ShikiMeta } from './Shikimori/metaOverview';
+import { MetaOverview as SpaceTimeDbMeta } from './SpaceTimeDB/metaOverview';
 
 export function getOverview(url, type, syncMode = '') {
   if (!syncMode) {
@@ -38,20 +39,11 @@ export function getOverview(url, type, syncMode = '') {
     return new MalApiMeta(url);
   }
   if (syncMode === 'SPACETIMEDB') {
-    // AniList metadata class does not support stdb:// URLs directly.
     if (/^stdb:\/\//i.test(url)) {
-      const mediaType = utils.urlPart(url, 2) === 'anime' ? 'anime' : 'manga';
-      const entryId = decodeURIComponent(utils.urlPart(url, 3) || '');
-
-      // Legacy entries may use MAL numeric ids as SpaceTimeDB entry ids.
-      if (/^\d+$/.test(entryId)) {
-        return new AniMeta(`https://myanimelist.net/${mediaType}/${entryId}`);
-      }
-
-      return new LocalMeta(url);
+      return new SpaceTimeDbMeta(url);
     }
 
-    // Non-stdb URLs can still use AniList metadata enrichment.
+    // Non-stdb URLs (e.g. from search correction) can still use AniList metadata enrichment.
     return new AniMeta(url);
   }
 

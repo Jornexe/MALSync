@@ -124,6 +124,47 @@ export const trackingSimple: ConfObj[] = [
     },
     component: SettingsGeneral,
   },
+  {
+    key: 'spacetimeTitleMergeAutomation',
+    title: () => 'SpaceTimeDB Title Merge Automation',
+    condition: () =>
+      api.settings.get('syncMode') === 'SPACETIMEDB' ||
+      api.settings.get('syncModeSimkl') === 'SPACETIMEDB',
+    props: {
+      component: 'dropdown',
+      option: 'spacetimeTitleMergeAutomation',
+      props: {
+        options: [
+          { title: 'Off (ID/Alias only)', value: 'off' },
+          { title: 'On (allow title-based merge)', value: 'on' },
+        ],
+      },
+      tooltip:
+        'Controls whether SpaceTimeDB may automatically merge entries using titles when IDs do not match.',
+    },
+    component: SettingsGeneral,
+  },
+  {
+    key: 'spacetimeTitleMergeStrictness',
+    title: () => 'SpaceTimeDB Title Merge Strictness',
+    condition: () =>
+      (api.settings.get('syncMode') === 'SPACETIMEDB' ||
+        api.settings.get('syncModeSimkl') === 'SPACETIMEDB') &&
+      api.settings.get('spacetimeTitleMergeAutomation') === 'on',
+    props: {
+      component: 'dropdown',
+      option: 'spacetimeTitleMergeStrictness',
+      props: {
+        options: [
+          { title: 'Exact title match only', value: 'exact' },
+          { title: 'Fuzzy (exact + strong containment)', value: 'fuzzy' },
+        ],
+      },
+      tooltip:
+        'Exact is safer for similarly named manga. Fuzzy is more automatic but can merge close title variants.',
+    },
+    component: SettingsGeneral,
+  },
 ];
 
 export const tracking: ConfObj[] = [

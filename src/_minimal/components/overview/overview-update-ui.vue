@@ -150,6 +150,25 @@
         </div>
       </div>
 
+      <div v-if="isSpaceTimeDbEntry" class="linked-aliases-select">
+        <div class="label-row">
+          <span class="label">Links</span>
+        </div>
+        <div v-if="linkedAliases.length" class="linked-aliases-list">
+          <span v-for="alias in linkedAliases" :key="alias" class="linked-alias-chip">
+            <span class="linked-alias-text">{{ alias }}</span>
+            <button
+              class="linked-alias-remove"
+              :disabled="singleLoading || unlinkBusyAlias === alias"
+              @click="unlinkAlias(alias)"
+            >
+              x
+            </button>
+          </span>
+        </div>
+        <div v-else class="linked-aliases-empty">No links</div>
+      </div>
+
     </div>
     <div class="update-buttons">
       <div
@@ -283,6 +302,7 @@ const isSpaceTimeDbEntry = computed(() => {
 
 const altTitlesInput = ref('');
 const altTitlesBaseline = ref('');
+const unlinkBusyAlias = ref('');
 
 watch(
   () => props.single,
@@ -304,6 +324,13 @@ watch(
 const altTitlesDirty = computed(() => {
   if (!isSpaceTimeDbEntry.value) return false;
   return altTitlesInput.value.trim() !== altTitlesBaseline.value.trim();
+});
+
+const linkedAliases = computed(() => {
+  if (!isSpaceTimeDbEntry.value || !props.single) return [] as string[];
+  if (typeof (props.single as any).getLinkedAliases !== 'function') return [] as string[];
+  const aliases = (props.single as any).getLinkedAliases();
+  return Array.isArray(aliases) ? aliases : [];
 });
 
 const status = computed({
@@ -413,6 +440,42 @@ async function remove() {
   }
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function unlinkAlias(alias: string) {
+  if (!props.single || !isSpaceTimeDbEntry.value) return;
+  if (typeof (props.single as any).unlinkSearchCandidate !== 'function') return;
+
+  const confirmed = await utils.flashConfirm(
+    `Unlink ${escapeHtml(alias)}?`,
+    'stdb-unlink-confirm-minimal',
+    () => undefined,
+    () => undefined,
+    true,
+  );
+  if (!confirmed) return;
+
+  unlinkBusyAlias.value = alias;
+  try {
+    try {
+      await (props.single as any).unlinkSearchCandidate({ targetEntryId: alias });
+    } catch {
+      await (props.single as any).unlinkSearchCandidate({ alias });
+    }
+    await props.single.update();
+    utils.flashm(`Removed link: ${alias}`);
+  } finally {
+    unlinkBusyAlias.value = '';
+  }
+}
+
 const episodeLang = utils.episode;
 </script>
 
@@ -440,6 +503,47 @@ const episodeLang = utils.episode;
   .alt-titles-select {
     margin-top: @spacer-half;
     min-height: 42px;
+  }
+  .linked-aliases-select {
+    margin-top: @spacer-half;
+  }
+  .linked-aliases-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .linked-aliases-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 14px;
+    background: var(--cl-foreground);
+    border: 1px solid var(--cl-divider);
+    max-width: 100%;
+  }
+  .linked-alias-text {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--cl-light-text);
+  }
+  .linked-alias-remove {
+    border: none;
+    background: transparent;
+    color: #ff8e8e;
+    cursor: pointer;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+  }
+  .linked-alias-remove:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .linked-aliases-empty {
+    color: var(--cl-text-muted);
   }
   .volume-select {
     margin-bottom: @spacer-half;

@@ -11,6 +11,7 @@
       <a style="cursor: pointer" @click="minimized = false"> Action required </a>
     </div>
     <div v-else class="scroll">
+      <div v-if="busy" class="m-s-pill" style="margin-bottom: 8px">{{ busyMessage }}</div>
       <entry v-if="!syncMode" :obj="syncPage.singleObj"></entry>
       <rules :obj="rulesClass"></rules>
 
@@ -64,7 +65,8 @@
         :type="searchClass.getNormalizedType()"
         :sync-mode="Boolean(syncMode)"
         :current-id="searchClass.getId()"
-        @clicked="setPage($event.url, $event.id)"
+        :linked-aliases="linkedAliases"
+        @clicked="onSearchItemClick"
       ></search>
     </div>
     <a v-if="!(syncMode && minimized)" class="close" @click="close()">{{ lang('close') }}</a>
@@ -88,6 +90,8 @@ export default {
   data: () => ({
     inputOffset: 0 as number | '0',
     minimized: false,
+    busy: false,
+    busyMessage: '',
     syncMode: null,
     searchClass: null as any,
     unmountFnc: () => {
@@ -120,6 +124,12 @@ export default {
       const titles = singleObj.getAlternativeTitles();
       return Array.isArray(titles) ? titles.join(', ') : '';
     },
+    linkedAliases() {
+      const singleObj = this.syncPage && this.syncPage.singleObj;
+      if (!singleObj || typeof singleObj.getLinkedAliases !== 'function') return [];
+      const aliases = singleObj.getLinkedAliases();
+      return Array.isArray(aliases) ? aliases : [];
+    },
     episodeWindow() {
       let start = this.currentStateEp + parseInt(this.inputOffset) - 2;
       if (start < 1) start = 1;
@@ -136,7 +146,74 @@ export default {
   },
   methods: {
     lang: api.storage.lang,
-    setPage(url, id = 0) {
+    async onSearchItemClick(payload) {
+      if (this.busy) return;
+      await this.setPage(payload?.url || '', payload?.id || 0, payload?.item || null);
+    },
+    getLookupAlias(item, url, id) {
+      if (!item || item.source === 'SpaceTimeDB') return '';
+
+      const source = String(item.source || '').toLowerCase();
+      if (Number.isFinite(id) && id > 0) {
+        if (source.includes('anilist')) return `anilist:${id}`;
+        if (source.includes('myanimelist') || /myanimelist\.net/i.test(url || '')) return `mal:${id}`;
+        if (source.includes('kitsu')) return `kitsu:${id}`;
+        if (source.includes('simkl')) return `simkl:${id}`;
+        if (source.includes('shiki')) return `shiki:${id}`;
+      }
+
+      if (url) return `url:${url}`;
+      return '';
+    },
+    async setPage(url, id = 0, item = null) {
+      if (this.isSpaceTimeDbEntry) {
+        const singleObj = this.syncPage && this.syncPage.singleObj;
+        if (!singleObj || typeof singleObj.linkSearchCandidate !== 'function') {
+          utils.flashm('SpaceTimeDB link target is unavailable', { error: true });
+          return;
+        }
+
+        const targetEntryId = item && item.source === 'SpaceTimeDB' ? String(item.sdbEntryId || '') : '';
+        const lookupAlias = this.getLookupAlias(item, url, id);
+        const existingAliases =
+          typeof singleObj.getLinkedAliases === 'function' ? singleObj.getLinkedAliases() : [];
+        const isLinkedTarget = Boolean(targetEntryId && existingAliases.includes(targetEntryId));
+
+        this.busy = true;
+        this.busyMessage = isLinkedTarget ? 'Removing link...' : 'Linking entry...';
+        try {
+          if (isLinkedTarget && typeof singleObj.unlinkSearchCandidate === 'function') {
+            await singleObj.unlinkSearchCandidate({ targetEntryId });
+          } else {
+            await singleObj.linkSearchCandidate({
+              targetEntryId: targetEntryId || undefined,
+              aliases: lookupAlias ? [lookupAlias] : [],
+              altTitles: Array.isArray(item?.altNames) ? item.altNames : [],
+              title: item?.name || '',
+            });
+          }
+
+          this.searchClass.changed = false;
+
+          if (this.syncPage && typeof this.syncPage.fillUI === 'function') {
+            this.syncPage.fillUI();
+          }
+
+          utils.flashm(
+            isLinkedTarget
+              ? 'Removed SpaceTimeDB link'
+              : targetEntryId
+                ? 'Linked SpaceTimeDB entries'
+                : 'Added alias data for SpaceTimeDB entry',
+          );
+          this.close();
+        } finally {
+          this.busy = false;
+          this.busyMessage = '';
+        }
+        return;
+      }
+
       this.searchClass.setUrl(url, id);
       utils.flashm(api.storage.lang('correction_NewUrl', [url]));
       this.close();

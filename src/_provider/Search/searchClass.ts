@@ -484,6 +484,10 @@ export class SearchClass {
   public async databaseRequest() {
     const logger = this.logger.m('DB Request');
     if (this.page && this.page.database && this.syncPage && this.state) {
+      if (getSyncMode(this.getNormalizedType()) === 'SPACETIMEDB') {
+        logger.log('Skip correction submission in SpaceTimeDB mode');
+        return;
+      }
       if (this.state.cache) return;
       if (this.state.provider === 'user' && !this.changed) return;
       if (this.state.provider === 'firebase') return;

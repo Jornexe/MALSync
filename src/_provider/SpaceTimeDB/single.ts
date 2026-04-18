@@ -16,6 +16,18 @@ function normalizeAltTitles(value: unknown): string[] {
   return [...dedupe];
 }
 
+function normalizeAliases(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const dedupe = new Set<string>();
+  value.forEach(el => {
+    if (typeof el !== 'string') return;
+    const trimmed = el.trim();
+    if (!trimmed) return;
+    dedupe.add(trimmed);
+  });
+  return [...dedupe];
+}
+
 export class Single extends SingleAbstract {
   constructor(protected url: string) {
     super(url);
@@ -235,6 +247,7 @@ export class Single extends SingleAbstract {
       });
       this.animeInfo = {
         name: (localInfo && localInfo.name) || titleFromUrl || this.entryId,
+        aliases: [this.entryId],
         altTitles: [],
         tags: (localInfo && localInfo.tags) || '',
         sUrl: (localInfo && localInfo.sUrl) || '',
@@ -250,6 +263,7 @@ export class Single extends SingleAbstract {
         this.animeInfo.name = this.getTitleFromUrl() || this.entryId;
       }
       this.animeInfo.altTitles = normalizeAltTitles(this.animeInfo.altTitles);
+      this.animeInfo.aliases = normalizeAliases(this.animeInfo.aliases);
       if (!this.animeInfo.sourceUrl) {
         this.animeInfo.sourceUrl = this.url;
       }
@@ -311,6 +325,10 @@ export class Single extends SingleAbstract {
     return normalizeAltTitles(this.animeInfo?.altTitles);
   }
 
+  getLinkedAliases() {
+    return normalizeAliases(this.animeInfo?.aliases).filter(alias => alias !== this.entryId);
+  }
+
   async setAlternativeTitles(value: string) {
     this.animeInfo.altTitles = normalizeAltTitles(
       value
@@ -320,5 +338,54 @@ export class Single extends SingleAbstract {
     );
     await this.sync();
     await this.update();
+  }
+
+  async linkSearchCandidate(payload: {
+    targetEntryId?: string;
+    aliases?: string[];
+    altTitles?: string[];
+    title?: string;
+  }) {
+    await this.sync();
+
+    const altTitles = normalizeAltTitles([...(payload.altTitles || []), payload.title || '']);
+    const aliases = normalizeAliases(payload.aliases || []);
+
+    await helper.linkEntry({
+      entryId: this.entryId,
+      mediaType: this.getType()!,
+      targetEntryId: payload.targetEntryId,
+      aliases,
+      altTitles,
+    });
+
+    // Wait briefly for the subscription cache to receive reducer updates.
+    for (let i = 0; i < 8; i++) {
+      await this.update();
+      if (this.isOnList()) {
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
+  }
+
+  async unlinkSearchCandidate(payload: { targetEntryId?: string; alias?: string }) {
+    await helper.unlinkEntry({
+      entryId: this.entryId,
+      mediaType: this.getType()!,
+      targetEntryId: payload.targetEntryId,
+      alias: payload.alias,
+    });
+
+    for (let i = 0; i < 8; i++) {
+      await this.update();
+      if (payload.targetEntryId && !this.getLinkedAliases().includes(payload.targetEntryId)) {
+        break;
+      }
+      if (payload.alias && !this.getLinkedAliases().includes(payload.alias)) {
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
   }
 }

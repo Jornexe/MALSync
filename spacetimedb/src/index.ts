@@ -78,6 +78,10 @@ function mergeAltTitles(current: string[], incoming: string[]) {
 	return [...dedupe];
 }
 
+function findOwnerRow<T extends { entryId: string; aliases: string[] }>(rows: T[], entryId: string) {
+	return rows.find(row => row.entryId === entryId || normalizeAliases(row.aliases).includes(entryId));
+}
+
 function hasTitleOverlap(
 	rowTitle: string,
 	rowAltTitles: string[],
@@ -155,9 +159,10 @@ export const upsert_entry = spacetimedb.reducer(
 			row => row.userKey === userKey && row.mediaType === params.mediaType,
 		);
 
-		let existing = ownerRows.find(
-			row => row.entryId === params.entryId || normalizeAliases(row.aliases).includes(params.entryId),
-		);
+		let existing = ownerRows.find(row => row.entryId === params.entryId);
+		if (!existing) {
+			existing = ownerRows.find(row => normalizeAliases(row.aliases).includes(params.entryId));
+		}
 		let resolvedBy: 'id-or-alias' | 'title' | 'none' = existing ? 'id-or-alias' : 'none';
 
 		const nextAltTitles = normalizeAltTitles(params.altTitles);
@@ -261,5 +266,193 @@ export const delete_entry = spacetimedb.reducer(
 
 		ctx.db.syncEntry.id.delete(existing.id);
 		console.log('[SpaceTimeDB][Server] delete_entry:done', { id: existing.id, entryId, mediaType });
+	},
+);
+
+export const link_entry = spacetimedb.reducer(
+	{
+		entryId: t.string(),
+		mediaType: t.string(),
+		userKey: t.string(),
+		targetEntryId: t.string().optional(),
+		aliases: t.array(t.string()).optional(),
+		altTitles: t.array(t.string()).optional(),
+	},
+	(ctx, { entryId, mediaType, userKey, targetEntryId, aliases, altTitles }) => {
+		console.log('[SpaceTimeDB][Server] link_entry:start', {
+			sender: ctx.sender.toHexString(),
+			entryId,
+			mediaType,
+			targetEntryId: normalizeValue(targetEntryId) || null,
+			userKey: normalizeUserKey(userKey) || null,
+		});
+
+		if (mediaType !== 'anime' && mediaType !== 'manga') {
+			throw new SenderError('mediaType must be anime or manga');
+		}
+
+		const normalizedUserKey = normalizeUserKey(userKey);
+		if (!normalizedUserKey) {
+			throw new SenderError('userKey is required');
+		}
+
+		const ownerRows = [...ctx.db.syncEntry.iter()].filter(
+			row => row.userKey === normalizedUserKey && row.mediaType === mediaType,
+		);
+
+		const source = findOwnerRow(ownerRows, entryId);
+		if (!source) {
+			throw new SenderError('source entry not found');
+		}
+
+		const normalizedTargetEntryId = normalizeValue(targetEntryId);
+		let target = source;
+		if (normalizedTargetEntryId) {
+			const foundTarget = findOwnerRow(ownerRows, normalizedTargetEntryId);
+			if (foundTarget) target = foundTarget;
+		}
+
+		const linkAliases = normalizeAliases([
+			...(aliases || []),
+			entryId,
+			...(normalizedTargetEntryId ? [normalizedTargetEntryId] : []),
+			source.entryId,
+			target.entryId,
+			...(source.aliases || []),
+			...(target.aliases || []),
+		]);
+		const linkAltTitles = mergeAltTitles(
+			mergeAltTitles(target.altTitles || [], source.altTitles || []),
+			normalizeAltTitles(altTitles),
+		);
+
+		if (target.id !== source.id) {
+			ctx.db.syncEntry.id.update({
+				...source,
+				aliases: linkAliases,
+				altTitles: linkAltTitles,
+				updatedAt: ctx.timestamp,
+			});
+
+			ctx.db.syncEntry.id.update({
+				...target,
+				aliases: linkAliases,
+				altTitles: linkAltTitles,
+				updatedAt: ctx.timestamp,
+			});
+
+			console.log('[SpaceTimeDB][Server] link_entry:linked', {
+				sourceId: source.id,
+				targetId: target.id,
+				entryId,
+				targetEntryId: normalizedTargetEntryId || null,
+			});
+			return;
+		}
+
+		ctx.db.syncEntry.id.update({
+			...source,
+			aliases: linkAliases,
+			altTitles: linkAltTitles,
+			updatedAt: ctx.timestamp,
+		});
+
+		console.log('[SpaceTimeDB][Server] link_entry:updated', {
+			id: source.id,
+			entryId,
+			targetEntryId: normalizedTargetEntryId || null,
+		});
+	},
+);
+
+export const unlink_entry = spacetimedb.reducer(
+	{
+		entryId: t.string(),
+		mediaType: t.string(),
+		userKey: t.string(),
+		targetEntryId: t.string().optional(),
+		alias: t.string().optional(),
+	},
+	(ctx, { entryId, mediaType, userKey, targetEntryId, alias }) => {
+		console.log('[SpaceTimeDB][Server] unlink_entry:start', {
+			sender: ctx.sender.toHexString(),
+			entryId,
+			mediaType,
+			targetEntryId: normalizeValue(targetEntryId) || null,
+			alias: normalizeValue(alias) || null,
+			userKey: normalizeUserKey(userKey) || null,
+		});
+
+		if (mediaType !== 'anime' && mediaType !== 'manga') {
+			throw new SenderError('mediaType must be anime or manga');
+		}
+
+		const normalizedUserKey = normalizeUserKey(userKey);
+		if (!normalizedUserKey) {
+			throw new SenderError('userKey is required');
+		}
+
+		const ownerRows = [...ctx.db.syncEntry.iter()].filter(
+			row => row.userKey === normalizedUserKey && row.mediaType === mediaType,
+		);
+
+		const source = findOwnerRow(ownerRows, entryId);
+		if (!source) {
+			throw new SenderError('source entry not found');
+		}
+
+		const normalizedTargetEntryId = normalizeValue(targetEntryId);
+		const normalizedAlias = normalizeValue(alias);
+
+		if (normalizedTargetEntryId) {
+			const target = findOwnerRow(ownerRows, normalizedTargetEntryId);
+			if (!target) {
+				throw new SenderError('target entry not found');
+			}
+
+			const sourceAliases = normalizeAliases(source.aliases).filter(
+				el => el !== target.entryId && el !== normalizedTargetEntryId,
+			);
+			const targetAliases = normalizeAliases(target.aliases).filter(
+				el => el !== source.entryId && el !== entryId,
+			);
+
+			ctx.db.syncEntry.id.update({
+				...source,
+				aliases: sourceAliases,
+				updatedAt: ctx.timestamp,
+			});
+
+			if (target.id !== source.id) {
+				ctx.db.syncEntry.id.update({
+					...target,
+					aliases: targetAliases,
+					updatedAt: ctx.timestamp,
+				});
+			}
+
+			console.log('[SpaceTimeDB][Server] unlink_entry:target', {
+				sourceId: source.id,
+				targetId: target.id,
+				entryId,
+				targetEntryId: normalizedTargetEntryId,
+			});
+			return;
+		}
+
+		if (normalizedAlias) {
+			const sourceAliases = normalizeAliases(source.aliases).filter(el => el !== normalizedAlias);
+			ctx.db.syncEntry.id.update({
+				...source,
+				aliases: sourceAliases,
+				updatedAt: ctx.timestamp,
+			});
+
+			console.log('[SpaceTimeDB][Server] unlink_entry:alias', {
+				id: source.id,
+				entryId,
+				alias: normalizedAlias,
+			});
+		}
 	},
 );

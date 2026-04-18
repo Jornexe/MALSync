@@ -61,6 +61,21 @@ export type SyncEntryPayload = {
   status: number;
 };
 
+export type SyncEntryLinkPayload = {
+  entryId: string;
+  mediaType: 'anime' | 'manga';
+  targetEntryId?: string;
+  aliases?: string[];
+  altTitles?: string[];
+};
+
+export type SyncEntryUnlinkPayload = {
+  entryId: string;
+  mediaType: 'anime' | 'manga';
+  targetEntryId?: string;
+  alias?: string;
+};
+
 const uriDefault = 'ws://127.0.0.1:3000';
 const databaseDefault = 'mal';
 const logScope = '[SpaceTimeDB][Client]';
@@ -135,6 +150,21 @@ const remoteModule = {
       mediaType: t.string(),
       userKey: t.string(),
     }),
+    reducerSchema('link_entry', {
+      entryId: t.string(),
+      mediaType: t.string(),
+      userKey: t.string(),
+      targetEntryId: t.string().optional(),
+      aliases: t.array(t.string()).optional(),
+      altTitles: t.array(t.string()).optional(),
+    }),
+    reducerSchema('unlink_entry', {
+      entryId: t.string(),
+      mediaType: t.string(),
+      userKey: t.string(),
+      targetEntryId: t.string().optional(),
+      alias: t.string().optional(),
+    }),
   ).reducersType,
   procedures: [] as const,
   versionInfo: { cliVersion: '2.1.0' as const },
@@ -161,6 +191,12 @@ function getToken() {
 function normalizeUserKey(value: string | null | undefined) {
   if (!value) return '';
   return value.trim().toLowerCase();
+}
+
+function normalizeValue(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : undefined;
 }
 
 function normalizeAltTitles(value: unknown): string[] {
@@ -593,6 +629,7 @@ export async function getEntry(
 
   return {
     name: row.title,
+    aliases: normalizeAliases(row.aliases),
     altTitles: normalizeAltTitles(row.altTitles),
     tags: row.tags,
     sUrl: row.streamingUrl || '',
@@ -651,4 +688,58 @@ export async function deleteEntry(entryId: string, mediaType: 'anime' | 'manga')
   });
 
   con.log(logScope, 'deleteEntry:done', { entryId, mediaType });
+}
+
+export async function linkEntry(payload: SyncEntryLinkPayload) {
+  con.log(logScope, 'linkEntry:start', {
+    entryId: payload.entryId,
+    mediaType: payload.mediaType,
+    targetEntryId: payload.targetEntryId || null,
+    aliases: payload.aliases || [],
+  });
+
+  const conn = await getConnection();
+  const userKey = requireLibraryKey();
+
+  await conn.reducers.linkEntry({
+    entryId: payload.entryId,
+    mediaType: payload.mediaType,
+    userKey,
+    targetEntryId: normalizeValue(payload.targetEntryId),
+    aliases: normalizeAliases(payload.aliases),
+    altTitles: normalizeAltTitles(payload.altTitles),
+  });
+
+  con.log(logScope, 'linkEntry:done', {
+    entryId: payload.entryId,
+    mediaType: payload.mediaType,
+    targetEntryId: payload.targetEntryId || null,
+  });
+}
+
+export async function unlinkEntry(payload: SyncEntryUnlinkPayload) {
+  con.log(logScope, 'unlinkEntry:start', {
+    entryId: payload.entryId,
+    mediaType: payload.mediaType,
+    targetEntryId: payload.targetEntryId || null,
+    alias: payload.alias || null,
+  });
+
+  const conn = await getConnection();
+  const userKey = requireLibraryKey();
+
+  await conn.reducers.unlinkEntry({
+    entryId: payload.entryId,
+    mediaType: payload.mediaType,
+    userKey,
+    targetEntryId: normalizeValue(payload.targetEntryId),
+    alias: normalizeValue(payload.alias),
+  });
+
+  con.log(logScope, 'unlinkEntry:done', {
+    entryId: payload.entryId,
+    mediaType: payload.mediaType,
+    targetEntryId: payload.targetEntryId || null,
+    alias: payload.alias || null,
+  });
 }

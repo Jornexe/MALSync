@@ -47,6 +47,8 @@
         <div class="image"><img :src="item.image" /></div>
         <div class="right">
           <span class="title">{{ item.name }}</span>
+          <p v-if="isSpaceTimeDbLinked(item)" class="linkHint linked">Linked - click to unlink</p>
+          <p v-else-if="item.source === 'SpaceTimeDB'" class="linkHint unlinked">Not linked - click to link</p>
           <p v-if="item.source">Source {{ item.source }}</p>
           <template v-if="item.list">
             <p>{{ lang('UI_Status') }} {{ getStatusText(type, item.list.status) }}</p>
@@ -76,6 +78,7 @@ import { getSyncList as getSpaceTimeDbSyncList } from '../../SpaceTimeDB/helper'
 
 type SearchDisplayResult = searchResult & {
   source?: string;
+  sdbEntryId?: string;
 };
 
 let searchTimeout;
@@ -97,6 +100,10 @@ export default {
     currentId: {
       type: Number,
       default: 0,
+    },
+    linkedAliases: {
+      type: Array as PropType<string[]>,
+      default: () => [],
     },
   },
   data() {
@@ -132,6 +139,12 @@ export default {
     getStatusText: utils.getStatusText,
     episodeText: utils.episode,
     providerTemplates,
+    isSpaceTimeDbLinked(item: SearchDisplayResult) {
+      if (!item || item.source !== 'SpaceTimeDB') return false;
+      const entryId = String(item.sdbEntryId || '').trim();
+      if (!entryId) return false;
+      return this.linkedAliases.includes(entryId);
+    },
     async getSpaceTimeDbResults(
       keyword: string,
       type: 'anime' | 'manga',
@@ -219,6 +232,7 @@ export default {
             id: Number.isFinite(maybeNumericId) ? maybeNumericId : 0,
             name: name || entryId || '[SDB] Entry',
             altNames: altTitles,
+            sdbEntryId: entryId,
             url: sourceUrl || `local://spacetimedb/${type}/${encodeURIComponent(entryId)}`,
             malUrl: () => Promise.resolve(null),
             image: String(entry?.image || ''),
@@ -279,14 +293,14 @@ export default {
     async clickItem(e, item) {
       e.preventDefault();
       if (!item) {
-        this.$emit('clicked', { url: '', id: 0 });
+        this.$emit('clicked', { url: '', id: 0, item: null });
         return;
       }
       const url = await item.malUrl();
       if (url) {
-        this.$emit('clicked', { url, id: item.id });
+        this.$emit('clicked', { url, id: item.id, item });
       } else {
-        this.$emit('clicked', { url: item.url, id: item.id });
+        this.$emit('clicked', { url: item.url, id: item.id, item });
       }
     },
   },

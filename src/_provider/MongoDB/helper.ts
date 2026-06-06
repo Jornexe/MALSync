@@ -266,6 +266,41 @@ async function mongoFetch<T = any>(path: string, init: RequestInit = {}): Promis
   return body as T;
 }
 
+/**
+ * Short-lived read cache for `/entries` GETs.
+ *
+ * A single sync-page load reads the list 2-3 times (local lookup, canonical
+ * single, first-visit rules cache), and each read pulls the whole library over
+ * the network. Caching for a few seconds collapses that burst into one request,
+ * which is the main driver of UI load time (especially over higher-latency
+ * links like Tailscale). Any write invalidates the cache, so reads stay
+ * consistent after a sync/link/delete.
+ */
+type EntriesCacheEntry = { ts: number; promise: Promise<any> };
+const entriesCache = new Map<string, EntriesCacheEntry>();
+const ENTRIES_CACHE_TTL = 10000;
+
+function fetchEntriesCached(path: string): Promise<any> {
+  const now = Date.now();
+  const cached = entriesCache.get(path);
+  if (cached && now - cached.ts < ENTRIES_CACHE_TTL) {
+    return cached.promise;
+  }
+
+  const entry: EntriesCacheEntry = { ts: now, promise: null as any };
+  entry.promise = mongoFetch(path).catch(err => {
+    // Never cache a failed request.
+    if (entriesCache.get(path) === entry) entriesCache.delete(path);
+    throw err;
+  });
+  entriesCache.set(path, entry);
+  return entry.promise;
+}
+
+function invalidateEntriesCache() {
+  entriesCache.clear();
+}
+
 export function clearSession() {
   con.log(logScope, 'clearSession');
   return api.settings.set('mongoApiKey', '');
@@ -298,7 +333,7 @@ export async function getSyncList() {
   const libraryKey = requireLibraryKey();
   const titleMergeMode = getTitleMergeMode();
 
-  const { rows = [] } = await mongoFetch<{ rows: MongoSyncRow[] }>(
+  const { rows = [] } = await fetchEntriesCached(
     `/entries?userKey=${encodeURIComponent(libraryKey)}`,
   );
 
@@ -347,7 +382,7 @@ export async function getEntry(
   const libraryKey = requireLibraryKey();
   const titleMergeMode = getTitleMergeMode();
 
-  const { rows = [] } = await mongoFetch<{ rows: MongoSyncRow[] }>(
+  const { rows = [] } = await fetchEntriesCached(
     `/entries?userKey=${encodeURIComponent(libraryKey)}&mediaType=${encodeURIComponent(mediaType)}`,
   );
 
@@ -428,6 +463,7 @@ export async function upsertEntry(payload: SyncEntryPayload) {
     }),
   });
 
+  invalidateEntriesCache();
   con.log(logScope, 'upsertEntry:done', { entryId: payload.entryId });
 }
 
@@ -439,6 +475,7 @@ export async function deleteEntry(entryId: string, mediaType: 'anime' | 'manga')
     )}&userKey=${encodeURIComponent(userKey)}`,
     { method: 'DELETE' },
   );
+  invalidateEntriesCache();
   con.log(logScope, 'deleteEntry:done', { entryId, mediaType });
 }
 
@@ -455,6 +492,7 @@ export async function linkEntry(payload: SyncEntryLinkPayload) {
       altTitles: normalizeAltTitles(payload.altTitles),
     }),
   });
+  invalidateEntriesCache();
   con.log(logScope, 'linkEntry:done', { entryId: payload.entryId });
 }
 
@@ -470,5 +508,6 @@ export async function unlinkEntry(payload: SyncEntryUnlinkPayload) {
       alias: normalizeValue(payload.alias),
     }),
   });
+  invalidateEntriesCache();
   con.log(logScope, 'unlinkEntry:done', { entryId: payload.entryId });
 }

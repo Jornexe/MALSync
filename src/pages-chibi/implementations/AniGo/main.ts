@@ -16,7 +16,7 @@ export const AniGo: PageInterface = {
         .run();
     },
     getTitle($c) {
-      return $c.querySelector('.aniDetail .title').text().replaceLinebreaks().run();
+      return $c.querySelector('.aniDetail .title').ifNotReturn().text().replaceLinebreaks().run();
     },
     getIdentifier($c) {
       return $c.url().urlPart(4).replaceRegex('-[^-]+$', '').trim().run();
@@ -25,7 +25,7 @@ export const AniGo: PageInterface = {
       return $c.url().replaceRegex('#.+$', '').run();
     },
     getEpisode($c) {
-      return $c.querySelector('.episodeList .active .number').text().number().run();
+      return $c.querySelector('.episodeList .active .number').ifNotReturn().text().number().run();
     },
     getImage($c) {
       return $c.querySelector('.poster img').getAttribute('src').ifNotReturn().urlAbsolute().run();
@@ -51,10 +51,10 @@ export const AniGo: PageInterface = {
       return $c.querySelectorAll('.episodeList ul li a').run();
     },
     elementEp($c) {
-      return $c.find('.number').text().number().run();
+      return $c.find('.number').ifNotReturn().text().number().run();
     },
     elementUrl($c) {
-      return $c.getAttribute('href').urlAbsolute().run();
+      return $c.getAttribute('href').ifNotReturn().urlAbsolute().run();
     },
   },
   lifecycle: {

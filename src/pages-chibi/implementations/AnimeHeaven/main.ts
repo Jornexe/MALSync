@@ -23,7 +23,14 @@ export const AnimeHeaven: PageInterface = {
       return $c.querySelector('.c2.ac2').getAttribute('href').ifNotReturn().urlAbsolute().run();
     },
     getEpisode($c) {
-      return $c.querySelector('.linetitle3.c').text().split('Episode ').at(1).number().run();
+      return $c
+        .querySelector('.linetitle3.c')
+        .ifNotReturn()
+        .text()
+        .split('Episode ')
+        .at(1)
+        .number()
+        .run();
     },
   },
   overview: {
@@ -31,7 +38,7 @@ export const AnimeHeaven: PageInterface = {
       return $c.url().urlPart(3).equals('anime.php').run();
     },
     getTitle($c) {
-      return $c.querySelector('.infotitle.c').text().trim().run();
+      return $c.querySelector('.infotitle.c').ifNotReturn().text().trim().run();
     },
     getIdentifier($c) {
       return $c.url().split('anime.php?').at(1).run();
@@ -48,7 +55,7 @@ export const AnimeHeaven: PageInterface = {
       return $c.querySelectorAll('.trackep0').run();
     },
     elementEp($c) {
-      return $c.find('.watch2').text().number().run();
+      return $c.find('.watch2').ifNotReturn().text().number().run();
     },
   },
   lifecycle: {

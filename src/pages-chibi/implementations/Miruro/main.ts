@@ -20,7 +20,7 @@ export const Miruro: PageInterface = {
         .run();
     },
     getTitle($c) {
-      return $c.querySelector('.title a').text().trim().run();
+      return $c.querySelector('.title a').ifNotReturn().text().trim().run();
     },
     getIdentifier($c) {
       return $c.url().urlPart(4).run();
@@ -29,7 +29,12 @@ export const Miruro: PageInterface = {
       return $c.querySelector('#root a[href*="info/"] img').getAttribute('src').ifNotReturn().run();
     },
     getOverviewUrl($c) {
-      return $c.querySelector('#root a[href*="info/"]').getAttribute('href').urlAbsolute().run();
+      return $c
+        .querySelector('#root a[href*="info/"]')
+        .getAttribute('href')
+        .ifNotReturn()
+        .urlAbsolute()
+        .run();
     },
     getEpisode($c) {
       return $c.url().urlParam('ep').number().run();
@@ -61,7 +66,7 @@ export const Miruro: PageInterface = {
         .run();
     },
     getTitle($c) {
-      return $c.querySelector('#root h1 span').text().trim().run();
+      return $c.querySelector('#root h1 span').ifNotReturn().text().trim().run();
     },
     getIdentifier($c) {
       return $c.url().urlPart(4).run();

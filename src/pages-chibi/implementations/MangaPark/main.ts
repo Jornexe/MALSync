@@ -37,13 +37,18 @@ export const MangaPark: PageInterface = {
         .run();
     },
     getTitle($c) {
-      return $c.querySelector('h3 > a[href*="/title/"]').text().trim().run();
+      return $c.querySelector('h3 > a[href*="/title/"]').ifNotReturn().text().trim().run();
     },
     getIdentifier($c) {
       return $c.this('sync.getOverviewUrl').urlPart(4).run();
     },
     getOverviewUrl($c) {
-      return $c.querySelector('h3 > a[href*="/title/"]').getAttribute('href').urlAbsolute().run();
+      return $c
+        .querySelector('h3 > a[href*="/title/"]')
+        .getAttribute('href')
+        .ifNotReturn()
+        .urlAbsolute()
+        .run();
     },
     getEpisode($c) {
       const chapter = $c
@@ -134,7 +139,7 @@ export const MangaPark: PageInterface = {
         .run();
     },
     getTitle($c) {
-      return $c.querySelector('main h3 a[href^="/title/"]').text().trim().run();
+      return $c.querySelector('main h3 a[href^="/title/"]').ifNotReturn().text().trim().run();
     },
     getIdentifier($c) {
       return $c.url().this('sync.getIdentifier').run();
@@ -156,7 +161,7 @@ export const MangaPark: PageInterface = {
       return $c.querySelectorAll('div[data-name="chapter-list"] a[href^="/title/"]').run();
     },
     elementUrl($c) {
-      return $c.getAttribute('href').urlAbsolute().run();
+      return $c.getAttribute('href').ifNotReturn().urlAbsolute().run();
     },
     elementEp($c) {
       return $c.target().this('list.elementUrl').this('sync.getEpisode').run();

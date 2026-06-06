@@ -14,7 +14,7 @@ export const anicrush: PageInterface = {
       return $c.url().urlPart(3).equals('watch').run();
     },
     getTitle($c) {
-      return $c.querySelector('div.main h2').text().trim().run();
+      return $c.querySelector('div.main h2').ifNotReturn().text().trim().run();
     },
     getIdentifier($c) {
       return $c.url().urlPart(4).ifNotReturn().split('.').last().run();
@@ -23,7 +23,12 @@ export const anicrush: PageInterface = {
       return $c.this('overview.getImage').run();
     },
     getOverviewUrl($c) {
-      return $c.querySelector('div.other-items a').getAttribute('href').urlAbsolute().run();
+      return $c
+        .querySelector('div.other-items a')
+        .getAttribute('href')
+        .ifNotReturn()
+        .urlAbsolute()
+        .run();
     },
     getEpisode($c) {
       return $c.url().urlParam('ep').number().run();

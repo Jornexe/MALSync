@@ -61,6 +61,7 @@ export default {
    * $c.html("<div>Parent <span>Child</span></div>").getBaseText() // returns "Parent "
    */
   getBaseText: (ctx: ChibiCtx, input: Element): string => {
+    if (!input) return '';
     return utils.getBaseText(j.$(input));
   },
 };

@@ -75,7 +75,7 @@ export const GaiaFlix: PageInterface = {
         .ifNotReturn()
         .text()
         .concat($c.string(' ').run())
-        .concat(getSeason($c).run())
+        .concat(getSeason($c).string().run())
         .trim()
         .run();
     },

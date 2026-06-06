@@ -35,6 +35,7 @@ export default {
    * $c.querySelector('div').find('h1')
    */
   find: (ctx: ChibiCtx, input: Element, selector: ChibiParam<string>) => {
+    if (!input) return null;
     return input.querySelector(selector);
   },
 
@@ -47,6 +48,7 @@ export default {
    * $c.querySelector('div').findAll('h1')
    */
   findAll: (ctx: ChibiCtx, input: Element, selector: ChibiParam<string>) => {
+    if (!input) return [];
     return Array.from(input.querySelectorAll(selector));
   },
 
@@ -58,6 +60,7 @@ export default {
    * $c.querySelector('h1').text()
    */
   text: (ctx: ChibiCtx, input: Element) => {
+    if (!input) return null;
     return input.textContent;
   },
 
@@ -69,6 +72,7 @@ export default {
    * $c.querySelector('h1').html()
    */
   html: (ctx: ChibiCtx, input: Element) => {
+    if (!input) return null;
     return input.innerHTML;
   },
 
@@ -80,6 +84,7 @@ export default {
    * $c.querySelector('select').elementValue().run()
    */
   elementValue: (ctx: ChibiCtx, input: Element) => {
+    if (!input) return null;
     return (input as HTMLInputElement).value;
   },
 
@@ -91,6 +96,7 @@ export default {
    * $c.querySelector('select').selectedText().run()
    */
   selectedText: (ctx: ChibiCtx, input: Element) => {
+    if (!input) return null;
     return (input as HTMLSelectElement).selectedOptions[0]?.text || null;
   },
 
@@ -103,6 +109,7 @@ export default {
    * $c.querySelector('input').getAttribute('value')
    */
   getAttribute: (ctx: ChibiCtx, input: Element, name: ChibiParam<string>) => {
+    if (!input) return null;
     return input.getAttribute(name);
   },
 
@@ -115,6 +122,7 @@ export default {
    * $c.querySelector('h1').getComputedStyle('color')
    */
   getComputedStyle: (ctx: ChibiCtx, input: Element, property: ChibiParam<string>) => {
+    if (!input) return null;
     return window.getComputedStyle(input).getPropertyValue(property);
   },
 
@@ -135,6 +143,7 @@ export default {
     value: ChibiParam<string>,
     important: ChibiParam<boolean> = false,
   ) => {
+    if (!input) return null;
     (input as HTMLElement).style.setProperty(property, value, important ? 'important' : '');
     return input;
   },
@@ -148,6 +157,7 @@ export default {
    * $c.querySelector('h1').closest('.container')
    */
   closest: (ctx: ChibiCtx, input: Element, selector: ChibiParam<string>) => {
+    if (!input) return null;
     return input.closest(selector);
   },
 
@@ -159,6 +169,7 @@ export default {
    * $c.querySelector('h1').parent()
    */
   parent: (ctx: ChibiCtx, input: Element) => {
+    if (!input) return null;
     return input.parentElement;
   },
 
@@ -170,6 +181,7 @@ export default {
    * $c.querySelector('h1').next()
    */
   next: (ctx: ChibiCtx, input: Element) => {
+    if (!input) return null;
     return input.nextElementSibling;
   },
 
@@ -181,6 +193,7 @@ export default {
    * $c.querySelector('h1').prev()
    */
   prev: (ctx: ChibiCtx, input: Element) => {
+    if (!input) return null;
     return input.previousElementSibling;
   },
 
@@ -193,6 +206,7 @@ export default {
    * $c.querySelector('h1').elementMatches('.highlight')
    */
   elementMatches: (ctx: ChibiCtx, input: Element, selector: ChibiParam<string>) => {
+    if (!input) return false;
     return input.matches(selector);
   },
 

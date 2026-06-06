@@ -129,6 +129,28 @@ const testCases = [
     },
     expectedUrl: 'local://MangaNato/manga/no::game::no::life',
   },
+  {
+    input: 'mongo://anime/12345/No%20Game%20No%20Life',
+    expect: {
+      path: {
+        type: 'anime',
+        slug: 'mongo:12345:No%20Game%20No%20Life',
+      },
+      url: '',
+    },
+    expectedUrl: 'mongo://anime/12345/No%20Game%20No%20Life',
+  },
+  {
+    input: 'mongo://manga/abc123',
+    expect: {
+      path: {
+        type: 'manga',
+        slug: 'mongo:abc123',
+      },
+      url: '',
+    },
+    expectedUrl: 'mongo://manga/abc123',
+  },
 ];
 
 describe('Slugs', function() {

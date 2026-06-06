@@ -32,7 +32,7 @@
       ></input-button>
 
       <input-button
-        v-if="isSpaceTimeDbEntry"
+        v-if="isLinkBasedEntry"
         label="Alternative titles (comma separated)"
         :state="altTitlesState"
         @clicked="setAlternativeTitles"
@@ -118,6 +118,13 @@ export default {
       const singleObj = this.syncPage && this.syncPage.singleObj;
       return Boolean(singleObj && singleObj.shortName === 'SpaceTimeDB');
     },
+    isMongoDbEntry() {
+      const singleObj = this.syncPage && this.syncPage.singleObj;
+      return Boolean(singleObj && singleObj.shortName === 'MongoDB');
+    },
+    isLinkBasedEntry() {
+      return this.isSpaceTimeDbEntry || this.isMongoDbEntry;
+    },
     altTitlesState() {
       const singleObj = this.syncPage && this.syncPage.singleObj;
       if (!singleObj || typeof singleObj.getAlternativeTitles !== 'function') return '';
@@ -151,7 +158,7 @@ export default {
       await this.setPage(payload?.url || '', payload?.id || 0, payload?.item || null);
     },
     getLookupAlias(item, url, id) {
-      if (!item || item.source === 'SpaceTimeDB') return '';
+      if (!item || item.source === 'SpaceTimeDB' || item.source === 'MongoDB') return '';
 
       const source = String(item.source || '').toLowerCase();
       if (Number.isFinite(id) && id > 0) {
@@ -165,15 +172,32 @@ export default {
       if (url) return `url:${url}`;
       return '';
     },
-    async setPage(url, id = 0, item = null) {
-      if (this.isSpaceTimeDbEntry) {
+    async setPage(url, id = 0, item: any = null) {
+      if (this.isLinkBasedEntry) {
         const singleObj = this.syncPage && this.syncPage.singleObj;
+        const providerLabel = this.isMongoDbEntry ? 'MongoDB' : 'SpaceTimeDB';
         if (!singleObj || typeof singleObj.linkSearchCandidate !== 'function') {
-          utils.flashm('SpaceTimeDB link target is unavailable', { error: true });
+          utils.flashm(`${providerLabel} link target is unavailable`, { error: true });
           return;
         }
 
-        const targetEntryId = item && item.source === 'SpaceTimeDB' ? String(item.sdbEntryId || '') : '';
+        const targetEntryId =
+          item && item.source === 'SpaceTimeDB'
+            ? String(item.sdbEntryId || '')
+            : item && item.source === 'MongoDB'
+              ? String(item.mongoEntryId || '')
+              : '';
+
+        // Clicking the current entry itself is not a valid link target.
+        const ownEntryId =
+          typeof singleObj.getPageId === 'function' ? String(singleObj.getPageId() || '') : '';
+        if (targetEntryId && ownEntryId && targetEntryId === ownEntryId) {
+          this.searchClass.changed = false;
+          utils.flashm('This is already the current entry');
+          this.close();
+          return;
+        }
+
         const lookupAlias = this.getLookupAlias(item, url, id);
         const existingAliases =
           typeof singleObj.getLinkedAliases === 'function' ? singleObj.getLinkedAliases() : [];
@@ -201,10 +225,10 @@ export default {
 
           utils.flashm(
             isLinkedTarget
-              ? 'Removed SpaceTimeDB link'
+              ? `Removed ${providerLabel} link`
               : targetEntryId
-                ? 'Linked SpaceTimeDB entries'
-                : 'Added alias data for SpaceTimeDB entry',
+                ? `Linked ${providerLabel} entries`
+                : `Added alias data for ${providerLabel} entry`,
           );
           this.close();
         } finally {

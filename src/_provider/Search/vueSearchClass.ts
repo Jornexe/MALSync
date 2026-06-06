@@ -17,6 +17,21 @@ export class SearchClass extends SearchClassExtend {
       con.log('similarity', this.state.similarity.value);
       return false;
     }
+
+    // Storage-only providers (SpaceTimeDB/MongoDB) own the entry once it is on
+    // the list. In that case it is correct by definition, so don't keep nagging
+    // with the correction UI (which could otherwise offer to link it to itself
+    // when a stale search cache hides the local match).
+    const singleObj = this.getSyncPage()?.singleObj;
+    if (
+      singleObj &&
+      (singleObj.shortName === 'SpaceTimeDB' || singleObj.shortName === 'MongoDB') &&
+      typeof singleObj.isOnList === 'function' &&
+      singleObj.isOnList()
+    ) {
+      return false;
+    }
+
     return this.openCorrection(true)!.then(() => {
       return this.changed;
     });

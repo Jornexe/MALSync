@@ -16,6 +16,7 @@ const shikiRegex = /^https:\/\/shikimori\.one\/(animes|mangas|ranobe)\/\D?(\d+)/
 const mangabakaRegex = /^https:\/\/mangabaka\.(?:dev|org)\/(\d+)(\/|$)/;
 const localRegex = /^local:\/\/([^/]+)\/(anime|manga)\/([^/]+)(\/|$)/;
 const spaceTimeDbRegex = /^stdb:\/\/(anime|manga)\/([^/]+)(?:\/([^/]*))?(\/|$)?/;
+const mongoDbRegex = /^mongo:\/\/(anime|manga)\/([^/]+)(?:\/([^/]*))?(\/|$)?/;
 
 export function urlToSlug(url: string): slugObject {
   const obj: slugObject = {
@@ -98,6 +99,20 @@ export function urlToSlug(url: string): slugObject {
     return obj;
   }
 
+  const mongoDbMatch = url.match(mongoDbRegex);
+  if (mongoDbMatch) {
+    const mongoEntryId = decodeURIComponent(mongoDbMatch[2]);
+    const mongoTitle = mongoDbMatch[3] ? decodeURIComponent(mongoDbMatch[3]) : '';
+    obj.path = {
+      type: mongoDbMatch[1] as 'anime' | 'manga',
+      slug: mongoTitle
+        ? `mongo:${mongoEntryId}:${encodeURIComponent(mongoTitle)}`
+        : `mongo:${mongoEntryId}`,
+    };
+    obj.url = '';
+    return obj;
+  }
+
   return obj;
 }
 
@@ -135,6 +150,16 @@ export function pathToUrl(path: Path): string {
       return `stdb://${path.type}/${encodeURIComponent(stdbEntryId)}/${stdbTitle}`;
     }
     return `stdb://${path.type}/${encodeURIComponent(stdbRest)}`;
+  }
+  if (path.slug.startsWith('mongo:')) {
+    const mongoRest = path.slug.substring(6);
+    const mongoColonIdx = mongoRest.indexOf(':');
+    if (mongoColonIdx !== -1) {
+      const mongoEntryId = mongoRest.substring(0, mongoColonIdx);
+      const mongoTitle = mongoRest.substring(mongoColonIdx + 1);
+      return `mongo://${path.type}/${encodeURIComponent(mongoEntryId)}/${mongoTitle}`;
+    }
+    return `mongo://${path.type}/${encodeURIComponent(mongoRest)}`;
   }
 
   throw new Error('Unknown Path Object');

@@ -42,6 +42,11 @@ export function providerTemplates(type: 'anime' | 'manga', malUrl?: string) {
       shortName: 'SpaceTimeDB',
     };
   }
+  if (syncMode === 'MONGODB') {
+    return {
+      shortName: 'MongoDB',
+    };
+  }
   return {
     shortName: 'Page',
   };

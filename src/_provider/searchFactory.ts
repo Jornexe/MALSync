@@ -28,6 +28,10 @@ export function search(
     // SpaceTimeDB is storage-only for list state; use AniList for title lookup.
     return aniSearch(keyword, type, options, sync);
   }
+  if (syncMode === 'MONGODB') {
+    // MongoDB sync is storage-only; use AniList for title lookup.
+    return aniSearch(keyword, type, options, sync);
+  }
   if (syncMode === 'MANGABAKA') {
     return mangaBakaSearch(keyword, type, options, sync);
   }

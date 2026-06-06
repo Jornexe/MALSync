@@ -9,11 +9,12 @@ import { UserList as SimklList } from './Simkl/list';
 import { UserList as ShikiList } from './Shikimori/list';
 import { UserList as LocalList } from './Local/list';
 import { UserList as SpaceTimeDbList } from './SpaceTimeDB/list';
+import { UserList as MongoDbList } from './MongoDB/list';
 
 export async function getList(...args) {
   let tempList: listElement[] = [];
   const syncMode = helper.getSyncMode(args[1] ? args[1] : 'anime');
-  if (api.settings.get('localSync') && syncMode !== 'SPACETIMEDB') {
+  if (api.settings.get('localSync') && syncMode !== 'SPACETIMEDB' && syncMode !== 'MONGODB') {
     const [status, listType] = args;
     const localListEl = new LocalList(status, listType);
     localListEl.modes.initProgress = true;
@@ -63,6 +64,9 @@ function getListObj(args, syncMode = '') {
   }
   if (syncMode === 'SPACETIMEDB') {
     return new SpaceTimeDbList(status, listType, sorting);
+  }
+  if (syncMode === 'MONGODB') {
+    return new MongoDbList(status, listType, sorting);
   }
   throw 'Unknown sync mode';
 }

@@ -12,6 +12,7 @@ import SettingsDisabledWebsites from './settings-disabled-websites.vue';
 import SettingsGroup from './settings-group.vue';
 import SettingsHr from './settings-hr.vue';
 import SettingsSpaceTimeProfile from './settings-spacetime-profile.vue';
+import SettingsMongoProfile from './settings-mongo-profile.vue';
 import { localStore } from '../../../utils/localStore';
 
 export const trackingSimple: ConfObj[] = [
@@ -154,6 +155,85 @@ export const trackingSimple: ConfObj[] = [
     props: {
       component: 'dropdown',
       option: 'spacetimeTitleMergeStrictness',
+      props: {
+        options: [
+          { title: 'Exact title match only', value: 'exact' },
+          { title: 'Fuzzy (exact + strong containment)', value: 'fuzzy' },
+        ],
+      },
+      tooltip:
+        'Exact is safer for similarly named manga. Fuzzy is more automatic but can merge close title variants.',
+    },
+    component: SettingsGeneral,
+  },
+  {
+    key: 'mongoProfile',
+    title: () => 'MongoDB Profile',
+    condition: () =>
+      api.settings.get('syncMode') === 'MONGODB' ||
+      api.settings.get('syncModeSimkl') === 'MONGODB',
+    component: SettingsMongoProfile,
+  },
+  {
+    key: 'mongoServerUrl',
+    title: () => 'MongoDB Server URL',
+    condition: () =>
+      api.settings.get('syncMode') === 'MONGODB' ||
+      api.settings.get('syncModeSimkl') === 'MONGODB',
+    props: {
+      component: 'input',
+      option: 'mongoServerUrl',
+      props: {
+        validation: (value: string) => Boolean(value && /^https?:\/\//i.test(value)),
+      },
+    },
+    component: SettingsGeneral,
+  },
+  {
+    key: 'mongoApiKey',
+    title: () => 'MongoDB API Key',
+    condition: () =>
+      api.settings.get('syncMode') === 'MONGODB' ||
+      api.settings.get('syncModeSimkl') === 'MONGODB',
+    props: {
+      component: 'input',
+      option: 'mongoApiKey',
+      props: {
+        validation: (value: string) => typeof value === 'string',
+      },
+    },
+    component: SettingsGeneral,
+  },
+  {
+    key: 'mongoTitleMergeAutomation',
+    title: () => 'MongoDB Title Merge Automation',
+    condition: () =>
+      api.settings.get('syncMode') === 'MONGODB' ||
+      api.settings.get('syncModeSimkl') === 'MONGODB',
+    props: {
+      component: 'dropdown',
+      option: 'mongoTitleMergeAutomation',
+      props: {
+        options: [
+          { title: 'Off (ID/Alias only)', value: 'off' },
+          { title: 'On (allow title-based merge)', value: 'on' },
+        ],
+      },
+      tooltip:
+        'Controls whether the MongoDB backend may automatically merge entries using titles when IDs do not match.',
+    },
+    component: SettingsGeneral,
+  },
+  {
+    key: 'mongoTitleMergeStrictness',
+    title: () => 'MongoDB Title Merge Strictness',
+    condition: () =>
+      (api.settings.get('syncMode') === 'MONGODB' ||
+        api.settings.get('syncModeSimkl') === 'MONGODB') &&
+      api.settings.get('mongoTitleMergeAutomation') === 'on',
+    props: {
+      component: 'dropdown',
+      option: 'mongoTitleMergeStrictness',
       props: {
         options: [
           { title: 'Exact title match only', value: 'exact' },

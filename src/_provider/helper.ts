@@ -6,7 +6,8 @@ export type SyncTypes =
   | 'SHIKI'
   | 'MALAPI'
   | 'MANGABAKA'
-  | 'SPACETIMEDB';
+  | 'SPACETIMEDB'
+  | 'MONGODB';
 
 export function getSyncMode(type = '' as 'anime' | 'manga' | '') {
   const primaryMode = api.settings.get('syncMode') as SyncTypes;
@@ -49,6 +50,13 @@ const providers: { [key in SyncTypes]: ProviderOption } = {
   SPACETIMEDB: {
     title: 'SpaceTimeDB',
     value: 'SPACETIMEDB',
+    anime: true,
+    manga: true,
+    short: true,
+  },
+  MONGODB: {
+    title: 'MongoDB',
+    value: 'MONGODB',
     anime: true,
     manga: true,
     short: true,

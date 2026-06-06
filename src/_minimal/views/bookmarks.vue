@@ -263,8 +263,9 @@ const listRequest = createRequest(parameters, async param => {
   listProvider.initFrontendMode();
 
   await listProvider.getNextPage().catch(async e => {
-    if (getSyncMode(param.value.type) === 'SPACETIMEDB') {
-      con.log('[Bookmarks] SpaceTimeDB list failed, falling back to local list', {
+    const currentMode = getSyncMode(param.value.type);
+    if (currentMode === 'SPACETIMEDB' || currentMode === 'MONGODB') {
+      con.log(`[Bookmarks] ${currentMode} list failed, falling back to local list`, {
         type: param.value.type,
         state: param.value.state,
         error: e,
@@ -283,7 +284,7 @@ const listRequest = createRequest(parameters, async param => {
         throw { e: localErr, html: localListProvider.errorMessage(localErr) };
       });
       listProvider = localListProvider;
-      utils.flashm('SpaceTimeDB is offline. Showing Local list.');
+      utils.flashm(`${currentMode === 'SPACETIMEDB' ? 'SpaceTimeDB' : 'MongoDB'} is offline. Showing Local list.`);
       return;
     }
     throw { e, html: listProvider.errorMessage(e) };

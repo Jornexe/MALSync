@@ -131,6 +131,14 @@ export const settingsObj = {
     spacetimeTitleMergeAutomation: 'on',
     spacetimeTitleMergeStrictness: 'fuzzy',
 
+    mongoServerUrl: 'http://localhost:8787',
+    mongoApiKey: '',
+    mongoProfile: 'profile1',
+    mongoProfileLastConfirmed: 'profile1',
+    mongoProfileConfirmSkip: false,
+    mongoTitleMergeAutomation: 'on',
+    mongoTitleMergeStrictness: 'fuzzy',
+
     shikiToken: '',
     shikiOptions: {
       locale: 'ru',

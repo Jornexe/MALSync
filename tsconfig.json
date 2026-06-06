@@ -22,6 +22,7 @@
     "dist",
     "**/*.test.ts",
     "**/*.exclude.ts",
-    "node_modules"
+    "node_modules",
+    "mongodb-backend"
   ]
 }

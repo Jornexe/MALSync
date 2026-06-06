@@ -8,6 +8,7 @@ import { MetaOverview as MangaBakaMeta } from './MangaBaka/metaOverview';
 import { MetaOverview as SimklMeta } from './Simkl/metaOverview';
 import { MetaOverview as ShikiMeta } from './Shikimori/metaOverview';
 import { MetaOverview as SpaceTimeDbMeta } from './SpaceTimeDB/metaOverview';
+import { MetaOverview as MongoDbMeta } from './MongoDB/metaOverview';
 
 export function getOverview(url, type, syncMode = '') {
   if (!syncMode) {
@@ -44,6 +45,13 @@ export function getOverview(url, type, syncMode = '') {
     }
 
     // Non-stdb URLs (e.g. from search correction) can still use AniList metadata enrichment.
+    return new AniMeta(url);
+  }
+  if (syncMode === 'MONGODB') {
+    if (/^mongo:\/\//i.test(url)) {
+      return new MongoDbMeta(url);
+    }
+
     return new AniMeta(url);
   }
 

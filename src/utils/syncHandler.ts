@@ -5,6 +5,7 @@ import { Single as SimklSingle } from '../_provider/Simkl/single';
 import { Single as ShikiSingle } from '../_provider/Shikimori/single';
 import { Single as BakaSingle } from '../_provider/MangaBaka/single';
 import { Single as SpaceTimeDbSingle } from '../_provider/SpaceTimeDB/single';
+import { Single as MongoDbSingle } from '../_provider/MongoDB/single';
 
 import { UserList as MalList } from '../_provider/MyAnimeList_hybrid/list';
 import { UserList as AnilistList } from '../_provider/AniList/list';
@@ -13,6 +14,7 @@ import { UserList as SimklList } from '../_provider/Simkl/list';
 import { UserList as ShikiList } from '../_provider/Shikimori/list';
 import { UserList as BakaList } from '../_provider/MangaBaka/list';
 import { UserList as SpaceTimeDbList } from '../_provider/SpaceTimeDB/list';
+import { UserList as MongoDbList } from '../_provider/MongoDB/list';
 import { getSyncMode } from '../_provider/helper';
 import { listElement } from '../_provider/listAbstract';
 import { status } from '../_provider/definitions';
@@ -45,6 +47,7 @@ export function getType(url) {
   if (utils.isDomainMatching(url, 'shikimori.one')) return 'SHIKI';
   if (utils.isDomainMatching(url, 'mangabaka.org')) return 'MANGABAKA';
   if (/^stdb:\/\//i.test(url)) return 'SPACETIMEDB';
+  if (/^mongo:\/\//i.test(url)) return 'MONGODB';
   throw 'Type not found';
 }
 
@@ -243,6 +246,8 @@ export function syncItem(slave, pageType) {
       singleClass = new BakaSingle(slave.url);
     } else if (pageType === 'SPACETIMEDB') {
       singleClass = new SpaceTimeDbSingle(slave.url);
+    } else if (pageType === 'MONGODB') {
+      singleClass = new MongoDbSingle(slave.url);
     } else {
       throw 'No sync type';
     }
@@ -366,6 +371,15 @@ export function getListProvider(providerSettingList) {
         master: false,
       },
       listProvider: SpaceTimeDbList,
+    },
+    {
+      providerType: 'MONGODB',
+      providerSettings: providerSettingList.mongodb || {
+        text: '',
+        list: null,
+        master: false,
+      },
+      listProvider: MongoDbList,
     },
   ];
 }

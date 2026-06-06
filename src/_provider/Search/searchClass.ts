@@ -488,6 +488,10 @@ export class SearchClass {
         logger.log('Skip correction submission in SpaceTimeDB mode');
         return;
       }
+      if (getSyncMode(this.getNormalizedType()) === 'MONGODB') {
+        logger.log('Skip correction submission in MongoDB mode');
+        return;
+      }
       if (this.state.cache) return;
       if (this.state.provider === 'user' && !this.changed) return;
       if (this.state.provider === 'firebase') return;

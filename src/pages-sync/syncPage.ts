@@ -271,16 +271,16 @@ export class SyncPage {
       fallbackUrl,
     });
 
-    if ((malUrl === null || !malUrl) && syncMode === 'SPACETIMEDB') {
-      logger.log('SpaceTimeDB Fallback');
+    if ((malUrl === null || !malUrl) && (syncMode === 'SPACETIMEDB' || syncMode === 'MONGODB')) {
+      logger.log(`${syncMode} Fallback`);
       malUrl = fallbackUrl;
     } else if ((malUrl === null || !malUrl) && api.settings.get('localSync')) {
       logger.log('Local Fallback');
       malUrl = localUrl;
     }
 
-    if (syncMode === 'SPACETIMEDB') {
-      logger.log('SpaceTimeDB Canonical URL', {
+    if (syncMode === 'SPACETIMEDB' || syncMode === 'MONGODB') {
+      logger.log(`${syncMode} Canonical URL`, {
         previousUrl: malUrl,
         canonicalUrl: fallbackUrl,
       });
@@ -308,8 +308,8 @@ export class SyncPage {
         if (e instanceof UrlNotSupportedError) {
           this.incorrectUrl();
           throw e;
-        } else if (e instanceof NotFoundError && syncMode === 'SPACETIMEDB') {
-          logger.log('SpaceTimeDB Fallback');
+        } else if (e instanceof NotFoundError && (syncMode === 'SPACETIMEDB' || syncMode === 'MONGODB')) {
+          logger.log(`${syncMode} Fallback`);
           tempSingle = getSingle(fallbackUrl);
           await tempSingle.update();
           this.singleObj = tempSingle;
@@ -601,9 +601,17 @@ export class SyncPage {
     return `stdb://${page.type}/${encodeURIComponent(state.identifier)}${encodedTitle}`;
   }
 
+  public generateMongoDbUrl(page, state) {
+    const encodedTitle = state.title ? `/${encodeURIComponent(state.title)}` : '';
+    return `mongo://${page.type}/${encodeURIComponent(state.identifier)}${encodedTitle}`;
+  }
+
   public generateFallbackUrl(page, state) {
     if (getSyncMode(page.type) === 'SPACETIMEDB') {
       return this.generateSpaceTimeDbUrl(page, state);
+    }
+    if (getSyncMode(page.type) === 'MONGODB') {
+      return this.generateMongoDbUrl(page, state);
     }
     return this.generateLocalUrl(page, state);
   }
@@ -852,7 +860,8 @@ export class SyncPage {
       j.$('#malStatus').val(this.singleObj.getStatusCheckboxValue());
       j.$('#malUserRating').val(this.singleObj.getScoreCheckboxValue());
 
-      const showSpaceTimeDbActions = this.singleObj.shortName === 'SpaceTimeDB';
+      const showSpaceTimeDbActions =
+        this.singleObj.shortName === 'SpaceTimeDB' || this.singleObj.shortName === 'MongoDB';
       j.$('.malp-group-stdb-actions').css('display', showSpaceTimeDbActions ? '' : 'none');
     }
     j.$('#MalData').css('display', 'flex');
@@ -1259,7 +1268,11 @@ export class SyncPage {
   }
 
   private async updateReadingUrl() {
-    if (!this.singleObj || this.singleObj.shortName !== 'SpaceTimeDB' || !this.singleObj.isOnList()) {
+    if (
+      !this.singleObj ||
+      (this.singleObj.shortName !== 'SpaceTimeDB' && this.singleObj.shortName !== 'MongoDB') ||
+      !this.singleObj.isOnList()
+    ) {
       return;
     }
 
@@ -1274,7 +1287,11 @@ export class SyncPage {
   }
 
   private async updateImage() {
-    if (!this.singleObj || this.singleObj.shortName !== 'SpaceTimeDB' || !this.singleObj.isOnList()) {
+    if (
+      !this.singleObj ||
+      (this.singleObj.shortName !== 'SpaceTimeDB' && this.singleObj.shortName !== 'MongoDB') ||
+      !this.singleObj.isOnList()
+    ) {
       return;
     }
 

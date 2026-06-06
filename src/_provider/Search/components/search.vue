@@ -47,8 +47,8 @@
         <div class="image"><img :src="item.image" /></div>
         <div class="right">
           <span class="title">{{ item.name }}</span>
-          <p v-if="isSpaceTimeDbLinked(item)" class="linkHint linked">Linked - click to unlink</p>
-          <p v-else-if="item.source === 'SpaceTimeDB'" class="linkHint unlinked">Not linked - click to link</p>
+          <p v-if="isSpaceTimeDbLinked(item) || isMongoDbLinked(item)" class="linkHint linked">Linked - click to unlink</p>
+          <p v-else-if="item.source === 'SpaceTimeDB' || item.source === 'MongoDB'" class="linkHint unlinked">Not linked - click to link</p>
           <p v-if="item.source">Source {{ item.source }}</p>
           <template v-if="item.list">
             <p>{{ lang('UI_Status') }} {{ getStatusText(type, item.list.status) }}</p>
@@ -75,10 +75,12 @@ import { searchResult } from '../../definitions';
 import { providerTemplates } from '../../../provider/templates';
 import { getSyncMode } from '../../helper';
 import { getSyncList as getSpaceTimeDbSyncList } from '../../SpaceTimeDB/helper';
+import { getSyncList as getMongoDbSyncList } from '../../MongoDB/helper';
 
 type SearchDisplayResult = searchResult & {
   source?: string;
   sdbEntryId?: string;
+  mongoEntryId?: string;
 };
 
 let searchTimeout;
@@ -144,6 +146,127 @@ export default {
       const entryId = String(item.sdbEntryId || '').trim();
       if (!entryId) return false;
       return this.linkedAliases.includes(entryId);
+    },
+    isMongoDbLinked(item: SearchDisplayResult) {
+      if (!item || item.source !== 'MongoDB') return false;
+      const entryId = String(item.mongoEntryId || '').trim();
+      if (!entryId) return false;
+      return this.linkedAliases.includes(entryId);
+    },
+    async getMongoDbResults(
+      keyword: string,
+      type: 'anime' | 'manga',
+    ): Promise<SearchDisplayResult[]> {
+      if (getSyncMode(type) !== 'MONGODB') {
+        return [];
+      }
+
+      const searchTerm = keyword.trim().toLowerCase();
+      if (!searchTerm) {
+        return [];
+      }
+
+      const normalizeSearchValue = (value: string) =>
+        value
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/gi, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+      const normalizedSearchTerm = normalizeSearchValue(searchTerm);
+
+      try {
+        const syncList = (await getMongoDbSyncList()) as Record<string, any>;
+        const results = [] as Array<SearchDisplayResult & { _score: number }>;
+
+        for (const [key, entry] of Object.entries(syncList)) {
+          if (!new RegExp(`^mongo://${type}/`, 'i').test(key)) {
+            continue;
+          }
+
+          const name = String(entry?.name || '').trim();
+          const altTitles = Array.isArray(entry?.altTitles)
+            ? entry.altTitles.map((el: unknown) => String(el || '').trim()).filter(Boolean)
+            : [];
+          const sourceUrl = String(entry?.sourceUrl || '').trim();
+          const searchText = `${name} ${altTitles.join(' ')} ${sourceUrl}`.toLowerCase();
+          const normalizedSearchText = normalizeSearchValue(searchText);
+          const textMatch = searchText.includes(searchTerm);
+          const normalizedMatch = normalizedSearchTerm
+            ? normalizedSearchText.includes(normalizedSearchTerm)
+            : false;
+          if (!textMatch && !normalizedMatch) {
+            continue;
+          }
+
+          const nameLower = name.toLowerCase();
+          const normalizedName = normalizeSearchValue(nameLower);
+          const altMatch = altTitles.some(el => {
+            const altLower = el.toLowerCase();
+            const normalizedAlt = normalizeSearchValue(altLower);
+            return (
+              altLower.includes(searchTerm) ||
+              (normalizedSearchTerm ? normalizedAlt.includes(normalizedSearchTerm) : false)
+            );
+          });
+          const altStartsWith = altTitles.some(el => {
+            const altLower = el.toLowerCase();
+            const normalizedAlt = normalizeSearchValue(altLower);
+            return (
+              altLower.startsWith(searchTerm) ||
+              (normalizedSearchTerm ? normalizedAlt.startsWith(normalizedSearchTerm) : false)
+            );
+          });
+          const score =
+            nameLower.startsWith(searchTerm) ||
+            (normalizedSearchTerm ? normalizedName.startsWith(normalizedSearchTerm) : false)
+            ? 3
+            : altStartsWith
+              ? 2
+              :
+                  nameLower.includes(searchTerm) ||
+                  (normalizedSearchTerm ? normalizedName.includes(normalizedSearchTerm) : false) ||
+                  altMatch
+                ? 1
+                : 0;
+
+          const entryId = decodeURIComponent(utils.urlPart(key, 3) || '');
+          const maybeNumericId = Number(entryId);
+          const parsedStatus = Number(entry?.status);
+          const parsedScore = Number(entry?.score);
+          const parsedProgress = Number(entry?.progress);
+
+          results.push({
+            id: Number.isFinite(maybeNumericId) ? maybeNumericId : 0,
+            name: name || entryId || '[Mongo] Entry',
+            altNames: altTitles,
+            mongoEntryId: entryId,
+            url: sourceUrl || `local://mongodb/${type}/${encodeURIComponent(entryId)}`,
+            malUrl: () => Promise.resolve(null),
+            image: String(entry?.image || ''),
+            imageLarge: String(entry?.image || ''),
+            media_type: type,
+            isNovel: false,
+            score: '',
+            year: '',
+            list: {
+              status: Number.isFinite(parsedStatus) ? parsedStatus : 6,
+              score: Number.isFinite(parsedScore) ? parsedScore : 0,
+              episode: Number.isFinite(parsedProgress) ? parsedProgress : 0,
+            },
+            source: 'MongoDB',
+            _score: score,
+          });
+        }
+
+        return results
+          .sort((a, b) => b._score - a._score)
+          .map(({ _score, ...item }) => item)
+          .slice(0, 8);
+      } catch (error) {
+        con.error('[Correction][MongoDB] Failed loading search candidates', error);
+        return [];
+      }
     },
     async getSpaceTimeDbResults(
       keyword: string,
@@ -264,21 +387,25 @@ export default {
       if (this.searchKeyword) {
         this.loading = true;
         const lookupSource =
-          getSyncMode(this.type) === 'SPACETIMEDB' ? 'AniList (lookup)' : providerTemplates(this.type).shortName;
+          getSyncMode(this.type) === 'SPACETIMEDB' || getSyncMode(this.type) === 'MONGODB'
+            ? 'AniList (lookup)'
+            : providerTemplates(this.type).shortName;
 
         Promise.all([
           this.getSpaceTimeDbResults(this.searchKeyword, this.type),
+          this.getMongoDbResults(this.searchKeyword, this.type),
           normalSearch(this.searchKeyword, this.type),
-        ]).then(([spaceTimeDbItems, items]) => {
+        ]).then(([spaceTimeDbItems, mongoDbItems, items]) => {
           this.loading = false;
-          const seenUrls = new Set(spaceTimeDbItems.map(item => item.url));
+          const fromList = spaceTimeDbItems.concat(mongoDbItems);
+          const seenUrls = new Set(fromList.map(item => item.url));
           const lookupItems = items
             .filter(item => !seenUrls.has(item.url))
             .map(item => ({
               ...item,
               source: lookupSource,
             }));
-          this.items = spaceTimeDbItems.concat(lookupItems);
+          this.items = fromList.concat(lookupItems);
           this.$nextTick(() => {
             this.$el.scrollIntoView({ behavior: 'smooth' });
           });

@@ -11,6 +11,7 @@ import { Single as SimklSingle } from './Simkl/single';
 import { Single as ShikiSingle } from './Shikimori/single';
 import { Single as LocalSingle } from './Local/single';
 import { Single as SpaceTimeDbSingle } from './SpaceTimeDB/single';
+import { Single as MongoDbSingle } from './MongoDB/single';
 
 export function getSingle(url: string) {
   if (/^local:\/\//i.test(url)) {
@@ -28,11 +29,17 @@ export function getSingle(url: string) {
     if (localType && localEntryId && localSyncMode === 'SPACETIMEDB') {
       return new SpaceTimeDbSingle(url);
     }
+    if (localType && localEntryId && localSyncMode === 'MONGODB') {
+      return new MongoDbSingle(url);
+    }
 
     return new LocalSingle(url);
   }
   if (/^stdb:\/\//i.test(url)) {
     return new SpaceTimeDbSingle(url);
+  }
+  if (/^mongo:\/\//i.test(url)) {
+    return new MongoDbSingle(url);
   }
 
   const slug = urlToSlug(url);
@@ -64,6 +71,9 @@ export function getSingle(url: string) {
   }
   if (syncMode === 'SPACETIMEDB') {
     return new SpaceTimeDbSingle(url);
+  }
+  if (syncMode === 'MONGODB') {
+    return new MongoDbSingle(url);
   }
   throw 'Unknown sync mode';
 }

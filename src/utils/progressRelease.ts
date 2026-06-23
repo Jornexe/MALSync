@@ -52,7 +52,6 @@ export class ProgressRelease {
       `release/${this.type}/${this.cacheKey}`,
     );
 
-    this.logger.m('Init Release').log(releaseItem);
     if (!releaseItem) return;
     if (progressIsOld(releaseItem)) {
       this.logger.log('Too old');

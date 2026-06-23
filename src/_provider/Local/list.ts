@@ -7,33 +7,39 @@ export class UserList extends ListAbstract {
 
   authenticationUrl = '';
 
+  protected clientSortSupported = true;
+
   async getUserObject() {
     return Promise.resolve({ username: 'local', picture: '', href: '' });
   }
 
   _getSortingOptions() {
-    return [];
+    return this.clientSortingOptions();
   }
 
   async getPart() {
     con.log('[UserList][Local]', `status: ${this.status}`);
     this.done = true;
-    const data = await this.prepareData(await this.getSyncList(), this.listType, this.status);
-    return data;
+    const syncList = await this.getSyncList();
+    if (api.storage.primeReadCache) await api.storage.primeReadCache();
+    try {
+      return await this.prepareData(syncList, this.listType, this.status);
+    } finally {
+      api.storage.clearReadCache?.();
+    }
   }
 
   private async prepareData(data, listType, status): Promise<listElement[]> {
-    const newData = [] as listElement[];
+    const tasks = [] as Promise<listElement>[];
     for (const key in data) {
       if (this.getRegex(listType).test(key)) {
         const el = data[key];
-        con.log(key, el);
         if (status !== definitions.status.All && parseInt(el.status) !== status) {
           continue;
         }
         if (listType === 'anime') {
-          newData.push(
-            await this.fn(
+          tasks.push(
+            this.fn(
               {
                 uid: key,
                 cacheKey: this.getCacheKey(utils.urlPart(key, 4), utils.urlPart(key, 2)),
@@ -55,8 +61,8 @@ export class UserList extends ListAbstract {
             ),
           );
         } else {
-          newData.push(
-            await this.fn(
+          tasks.push(
+            this.fn(
               {
                 uid: key,
                 cacheKey: this.getCacheKey(utils.urlPart(key, 4), utils.urlPart(key, 2)),
@@ -83,8 +89,7 @@ export class UserList extends ListAbstract {
       }
     }
 
-    con.log('data', newData);
-    return newData;
+    return Promise.all(tasks);
   }
 
   private getRegex = helper.getRegex;

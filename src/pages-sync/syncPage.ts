@@ -161,6 +161,10 @@ export class SyncPage {
   }
 
   async handlePage(curUrl = window.location.href) {
+    // [perf] temporary load-time instrumentation — remove once UI load is tuned.
+    const perfStart = performance.now();
+    const perf = (label: string) =>
+      logger.log('[perf]', label, `${Math.round(performance.now() - perfStart)}ms`);
     let state: pageState;
     this.curState = undefined;
     this.setSearchObj(undefined);
@@ -170,6 +174,7 @@ export class SyncPage {
 
     if (this.page.isSyncPage(this.url)) {
       this.loadUI();
+      perf('loadUI');
       state = {
         on: 'SYNC',
         title: this.page.sync.getTitle(this.url),
@@ -185,9 +190,11 @@ export class SyncPage {
       this.searchObj.setLocalUrl(this.generateFallbackUrl(this.page, state));
       this.curState = state;
       await this.searchObj.search();
+      perf('search');
 
       try {
         tempSingle = await this.searchObj.initRules();
+        perf('initRules');
       } catch (e) {
         if (e instanceof UrlNotSupportedError) {
           this.incorrectUrl();
@@ -325,6 +332,7 @@ export class SyncPage {
           throw e;
         }
       }
+      perf('single update');
 
       // Discord Presence
       if (api.type === 'webextension' && api.settings.get('rpc')) {
@@ -339,10 +347,12 @@ export class SyncPage {
 
       // fillUI
       this.fillUI();
+      perf('fillUI');
 
       // sync
       if (this.page.isSyncPage(this.url)) {
         const rerun = await this.searchObj.openCorrectionCheck();
+        perf('openCorrectionCheck');
 
         if (rerun) {
           // If malUrl changed

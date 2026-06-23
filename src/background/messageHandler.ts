@@ -70,6 +70,9 @@ function messageHandler(
 }
 
 function videoTimeAction(message: videoTime, sender, sendResponse) {
+  // Messages from extension pages (popup/minimal window) have no sender.tab, so
+  // there's no content tab to relay to — no-op instead of throwing on .id.
+  if (!sender?.tab?.id) return undefined;
   chrome.tabs.sendMessage(sender.tab.id, {
     action: 'videoTime',
     item: message.item,
@@ -79,6 +82,7 @@ function videoTimeAction(message: videoTime, sender, sendResponse) {
 }
 
 function contentAction(message: content, sender, sendResponse) {
+  if (!sender?.tab?.id) return undefined;
   chrome.tabs.sendMessage(sender.tab.id, {
     action: 'content',
     item: message.item,

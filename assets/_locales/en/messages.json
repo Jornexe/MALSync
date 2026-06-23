@@ -807,6 +807,18 @@
         "message": "Score",
         "description": "Dropdown option to sort list by score"
     },
+    "list_sorting_progress": {
+        "message": "Progress",
+        "description": "Dropdown option to sort list by watched episodes / read chapters"
+    },
+    "settings_listDefaultSort": {
+        "message": "Default list sort",
+        "description": "Settings label for the default sort order of the bookmarks/overview list"
+    },
+    "settings_listDefaultSort_Text": {
+        "message": "Sort order used for the overview list until you change it per list with the sort dropdown.",
+        "description": "Tooltip for the default list sort setting"
+    },
     "list_sorting_airing_date": {
         "message": "Airing date",
         "description": "Dropdown option to sort list by airing date"

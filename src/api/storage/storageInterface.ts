@@ -7,6 +7,14 @@ export interface storageInterface {
 
   list(from?: string): Promise<{ [key: string]: any }>;
 
+  // Optional bulk-read fast path. primeReadCache() loads the whole local store
+  // once so that subsequent get() calls for local keys are served from memory
+  // instead of one IPC per key. Used to decorate large lists (1k+ entries)
+  // without thousands of individual storage reads. Must be cleared afterwards.
+  primeReadCache?(): Promise<void>;
+
+  clearReadCache?(): void;
+
   addStyle(css: string): Promise<void>;
 
   version(): string;

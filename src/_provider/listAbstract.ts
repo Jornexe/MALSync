@@ -5,6 +5,14 @@ import { errorMessage as _errorMessage } from './Errors';
 
 Object.seal(emitter);
 
+// Natural-order title compare ("Re:Zero 2" before "Re:Zero 10") for the
+// alphabetic sort, case/diacritic insensitive.
+const listTitleCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+function listProgressValue(item: listElement): number {
+  return Math.max(Number(item.watchedEp) || 0, Number(item.readVol) || 0);
+}
+
 export interface listElement {
   uid: number | string;
   malId: number | null;
@@ -12,6 +20,9 @@ export interface listElement {
   cacheKey: any;
   type: 'anime' | 'manga';
   title: string;
+  // Alternative titles / synonyms, when the provider has them (e.g. MongoDB).
+  // Used by the library search so an entry is findable by any of its titles.
+  altTitles?: string[];
   url: string;
   score: number;
   watchedEp: number;
@@ -27,6 +38,9 @@ export interface listElement {
   imageBanner?: string;
   tags: string;
   airingState?: number | string;
+  // Epoch milliseconds of the last change to the entry. Only populated by
+  // providers that track it (e.g. MongoDB); used by the "Last updated" sort.
+  updatedAt?: number;
   fn: {
     continueUrl: () => string;
     initProgress: () => Promise<void>;
@@ -46,6 +60,11 @@ export abstract class ListAbstract {
   protected loading = false;
 
   protected firstLoaded = false;
+
+  // Providers that load the whole list client-side (Local/MongoDB/SpaceTimeDB)
+  // set this so the base flow sorts the loaded list in memory. Server-paginated
+  // providers leave it false and sort via their API instead.
+  protected clientSortSupported = false;
 
   protected abstract authenticationUrl: string;
 
@@ -138,11 +157,73 @@ export abstract class ListAbstract {
 
     await this.getNext();
 
+    if (this.clientSortSupported) this.applyClientSort();
+
     if (this.modes.cached) this.getCache().setValue(this.templist.slice(0, 24));
 
     this.firstLoaded = true;
 
     return this.templist;
+  }
+
+  // Sort options shared by the client-side providers. The base list already
+  // offers default/unread/latest_release; these add stable in-memory sorts that
+  // rely only on data every provider has (title/score/progress).
+  protected clientSortingOptions(): {
+    icon: string;
+    title: string;
+    value: string;
+    asc?: boolean;
+  }[] {
+    return [
+      {
+        icon: 'sort_by_alpha',
+        title: api.storage.lang('list_sorting_alpha'),
+        value: 'alpha',
+      },
+      {
+        icon: 'score',
+        title: api.storage.lang('list_sorting_score'),
+        value: 'score',
+        asc: true,
+      },
+      {
+        icon: 'trending_up',
+        title: api.storage.lang('list_sorting_progress'),
+        value: 'progress',
+        asc: true,
+      },
+    ];
+  }
+
+  // Applies the generic in-memory sorts (alpha/score/progress/updated). The
+  // default/unread/latest_release values are handled by sortAiringList and are
+  // intentionally left untouched here.
+  protected applyClientSort() {
+    const raw = (this.sort || 'default').toString();
+    const ascending = raw.endsWith('_asc');
+    const field = raw.replace(/_asc$/, '');
+
+    let comparator: ((a: listElement, b: listElement) => number) | null = null;
+    switch (field) {
+      case 'alpha':
+        comparator = (a, b) => listTitleCollator.compare(a.title || '', b.title || '');
+        break;
+      case 'score':
+        comparator = (a, b) => (Number(b.score) || 0) - (Number(a.score) || 0);
+        break;
+      case 'progress':
+        comparator = (a, b) => listProgressValue(b) - listProgressValue(a);
+        break;
+      case 'updated':
+        comparator = (a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
+        break;
+      default:
+        return;
+    }
+
+    this.templist = this.templist.slice().sort(comparator);
+    if (ascending) this.templist.reverse();
   }
 
   private async getNext() {

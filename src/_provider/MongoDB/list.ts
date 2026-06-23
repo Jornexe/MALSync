@@ -8,6 +8,8 @@ export class UserList extends ListAbstract {
 
   authenticationUrl = 'https://www.mongodb.com';
 
+  protected clientSortSupported = true;
+
   async getUserObject() {
     return helper.getUserObject();
   }
@@ -17,19 +19,43 @@ export class UserList extends ListAbstract {
   }
 
   _getSortingOptions() {
-    return [];
+    // MongoDB persists updatedAt per entry, so it can offer "Last updated" on
+    // top of the shared title/score/progress sorts.
+    return [
+      ...this.clientSortingOptions(),
+      {
+        icon: 'history',
+        title: api.storage.lang('list_sorting_history'),
+        value: 'updated',
+        asc: true,
+      },
+    ];
   }
 
   async getPart() {
     con.log('[UserList][MongoDB]', `status: ${this.status}`);
     this.done = true;
 
-    const data = await this.getSyncList();
-    return this.prepareData(data, this.listType, this.status);
+    const data = await this.getSyncList(
+      this.listType,
+      this.status === definitions.status.All ? undefined : this.status,
+    );
+    // Decorating 1k+ entries reads several storage keys each; prime a single
+    // bulk snapshot so those become in-memory lookups instead of one IPC apiece.
+    if (api.storage.primeReadCache) await api.storage.primeReadCache();
+    try {
+      return await this.prepareData(data, this.listType, this.status);
+    } finally {
+      api.storage.clearReadCache?.();
+    }
   }
 
   private async prepareData(data, listType, status): Promise<listElement[]> {
-    const newData = [] as listElement[];
+    // Build every entry's item function concurrently. Each fn() performs a few
+    // independent storage reads (tag settings, continue/resume URLs, progress);
+    // awaiting them one entry at a time turns a 1k+ library into thousands of
+    // serial round-trips, which is the main driver of overview load time.
+    const tasks = [] as Promise<listElement>[];
 
     for (const key in data) {
       if (!this.getRegex(listType).test(key)) {
@@ -44,8 +70,8 @@ export class UserList extends ListAbstract {
       const sourceUrl = el.sourceUrl || `local://mongodb/${listType}/${encodeURIComponent(el.name)}`;
 
       if (listType === 'anime') {
-        newData.push(
-          await this.fn(
+        tasks.push(
+          this.fn(
             {
               uid: key,
               cacheKey: this.getCacheKey(decodeURIComponent(utils.urlPart(key, 3)), 'anime'),
@@ -57,6 +83,7 @@ export class UserList extends ListAbstract {
               apiCacheKey: 0,
               tags: el.tags,
               title: el.name,
+              altTitles: Array.isArray(el.altTitles) ? el.altTitles : [],
               url: sourceUrl,
               score: Number(el.score) || 0,
               watchedEp: Number(el.progress) || 0,
@@ -65,13 +92,14 @@ export class UserList extends ListAbstract {
               startDate: null,
               finishDate: null,
               rewatchCount: 0,
+              updatedAt: el.updatedAt || 0,
             },
             el.sUrl,
           ),
         );
       } else {
-        newData.push(
-          await this.fn(
+        tasks.push(
+          this.fn(
             {
               uid: key,
               cacheKey: this.getCacheKey(decodeURIComponent(utils.urlPart(key, 3)), 'manga'),
@@ -83,6 +111,7 @@ export class UserList extends ListAbstract {
               apiCacheKey: 0,
               tags: el.tags,
               title: el.name,
+              altTitles: Array.isArray(el.altTitles) ? el.altTitles : [],
               url: sourceUrl,
               score: Number(el.score) || 0,
               watchedEp: Number(el.progress) || 0,
@@ -93,6 +122,7 @@ export class UserList extends ListAbstract {
               startDate: null,
               finishDate: null,
               rewatchCount: 0,
+              updatedAt: el.updatedAt || 0,
             },
             el.sUrl,
           ),
@@ -100,7 +130,7 @@ export class UserList extends ListAbstract {
       }
     }
 
-    return newData;
+    return Promise.all(tasks);
   }
 
   private getRegex = helper.getRegex;

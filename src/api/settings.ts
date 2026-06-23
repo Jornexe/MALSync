@@ -94,6 +94,7 @@ export const settingsObj = {
 
     bookMarksList: false,
     bookMarksListManga: false,
+    listDefaultSort: 'default',
 
     customDomains: [],
 

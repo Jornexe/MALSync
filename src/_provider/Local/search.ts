@@ -4,6 +4,8 @@ import { listElement } from '../listAbstract';
 import { UserList as LocalList } from './list';
 import { searchResult } from '../definitions';
 import { normalSearch } from '../../utils/Search';
+import { getSyncMode } from '../helper';
+import { getOnlyList } from '../listFactory';
 
 const searchFuse: {
   anime: null | Fuse<listElement>;
@@ -13,14 +15,29 @@ const searchFuse: {
   manga: null,
 };
 
+// The library lives in different places depending on the sync mode. For the
+// storage-only providers (MongoDB/SpaceTimeDB) the user's entries exist only in
+// that provider, so the search index must come from there — otherwise searching
+// returns zero of the user's tracked entries. Other modes keep using the Local
+// cache (their list is searchable remotely via normalSearch).
+async function getSearchList(type: 'anime' | 'manga'): Promise<listElement[]> {
+  const syncMode = getSyncMode(type);
+  if (syncMode === 'MONGODB' || syncMode === 'SPACETIMEDB') {
+    return getOnlyList(7, type).getCompleteList();
+  }
+  return new LocalList(7, type).getCompleteList();
+}
+
 export async function search(searchterm: string, type: 'anime' | 'manga'): Promise<searchResult[]> {
   if (!searchFuse[type]) {
-    const localListEl = new LocalList(7, type);
-    const tempList = await localListEl.getCompleteList();
+    const tempList = await getSearchList(type);
     searchFuse[type] = new Fuse(tempList, {
       minMatchCharLength: 3,
       threshold: 0.4,
-      keys: ['title'],
+      keys: [
+        { name: 'title', weight: 0.7 },
+        { name: 'altTitles', weight: 0.3 },
+      ],
     });
   }
 
@@ -30,7 +47,7 @@ export async function search(searchterm: string, type: 'anime' | 'manga'): Promi
     return {
       id: 0,
       name: el.item.title,
-      altNames: [],
+      altNames: el.item.altTitles || [],
       url: el.item.url,
       malUrl: () => Promise.resolve(null),
       image: el.item.image,

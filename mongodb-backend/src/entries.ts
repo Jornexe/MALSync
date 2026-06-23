@@ -207,11 +207,14 @@ export async function deleteEntry(
 export async function listEntries(
   db: Db,
   ownerId: string,
-  filters: { userKey: string; mediaType?: 'anime' | 'manga' },
+  filters: { userKey: string; mediaType?: 'anime' | 'manga'; status?: number },
 ): Promise<SyncEntryDoc[]> {
   const userKey = requireUserKey(filters.userKey);
   const query: Record<string, unknown> = { ownerId, userKey };
   if (filters.mediaType) query.mediaType = filters.mediaType;
+  if (typeof filters.status === 'number' && Number.isFinite(filters.status)) {
+    query.status = filters.status;
+  }
   return syncEntries(db).find(query).toArray();
 }
 

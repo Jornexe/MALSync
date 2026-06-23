@@ -57,7 +57,7 @@ async function registerScripts() {
   }
 
   const scripts = await chrome.scripting.getRegisteredContentScripts();
-  logger.log(scripts);
+  logger.log('Registered', scripts.length, 'content scripts');
 }
 
 async function registerScript(domainConfig: domainType) {
@@ -92,10 +92,7 @@ async function registerScript(domainConfig: domainType) {
     await chrome.scripting.registerContentScripts([scriptConfig]);
   } catch (e) {
     logger.error(`Could not add listener for ${fixDomain}`, e);
-    return;
   }
-
-  logger.m('registred').m(domainConfig.page).log(fixDomain);
 }
 
 export async function cleanupCustomDomains() {

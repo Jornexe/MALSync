@@ -128,7 +128,7 @@
           <TransitionStaggered :delay-duration="listTheme.transition">
             <component
               :is="listTheme.component"
-              v-for="item in list!"
+              v-for="item in visibleList!"
               :key="item.uid"
               :item="formatItem(item as listElement)"
             />
@@ -213,6 +213,12 @@ const parameters = ref({
 });
 const cacheList = ref([] as listElement[]);
 
+// Only this many items are mounted into the DOM at once; the window grows as the
+// user scrolls. The full list still lives in memory (so sorting/filtering is
+// over everything) — we just don't render 1k+ components to show ~9.
+const RENDER_BATCH = 40;
+const renderLimit = ref(RENDER_BATCH);
+
 watch(
   () => props.type,
   value => {
@@ -241,10 +247,16 @@ watch(
   },
 );
 
+const isSupportedSort = (sortingOptions, value) =>
+  Boolean(value && sortingOptions.find(el => el.value === value.replace('_asc', '')));
+
 const getSort = sortingOptions => {
   const curSort = localStore.getItem(`sort/${parameters.value.type}/${parameters.value.state}`);
-  if (curSort && sortingOptions.find(el => el.value === curSort.replace('_asc', '')))
-    return curSort;
+  if (isSupportedSort(sortingOptions, curSort)) return curSort;
+  // Fall back to the user's configured default sort, if the active provider
+  // supports it; otherwise the built-in default.
+  const defaultSort = api.settings.get('listDefaultSort');
+  if (isSupportedSort(sortingOptions, defaultSort)) return defaultSort;
   return 'default';
 };
 
@@ -341,6 +353,17 @@ const list = computed(() => {
   return dedupedList;
 });
 
+const visibleList = computed(() => (list.value ? list.value.slice(0, renderLimit.value) : null));
+
+// Every fresh load (type/state/sort change or refresh) restarts the window at
+// the top so the user isn't dropped mid-list.
+watch(
+  () => listRequest.loading,
+  loading => {
+    if (loading) renderLimit.value = RENDER_BATCH;
+  },
+);
+
 const formatItem = (item: listElement): bookmarkItem => {
   const resItem = item as bookmarkItem;
   if (item.options) {
@@ -404,6 +427,13 @@ const handleScroll = () => {
     rootWindow.pageYOffset + rootWindow.innerHeight >
     rootDocument.documentElement.scrollHeight - 600
   ) {
+    // Reveal more of the already-loaded list first; only ask the provider for a
+    // new page once the whole in-memory list is on screen (server-paginated
+    // providers still need this).
+    if (list.value && renderLimit.value < list.value.length) {
+      renderLimit.value += RENDER_BATCH;
+      return;
+    }
     loadNext();
   }
 };

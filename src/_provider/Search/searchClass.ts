@@ -148,14 +148,22 @@ export class SearchClass {
   }
 
   public async search() {
+    // [perf] temporary instrumentation — remove once UI load is tuned.
+    const perfStart = performance.now();
+    const perf = (label: string) =>
+      this.logger.log('[perf] search', label, `${Math.round(performance.now() - perfStart)}ms`);
+
     this.state = await this.getCache();
+    if (this.state) perf('resolved via cache');
 
     if (!this.state) {
       this.state = await this.searchLocal();
+      if (this.state) perf('resolved via searchLocal');
     }
 
     if (!this.state) {
       this.state = await this.searchForIt();
+      perf('searchForIt ran (remote MAL/AniList)');
     }
 
     if (

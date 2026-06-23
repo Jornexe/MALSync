@@ -44,6 +44,8 @@ export async function getDb(): Promise<Db> {
       { unique: true },
     ),
     syncEntries(db).createIndex({ ownerId: 1, userKey: 1, mediaType: 1, aliases: 1 }),
+    // Supports the list view's mediaType (+ optional status) filtered fetch.
+    syncEntries(db).createIndex({ ownerId: 1, userKey: 1, mediaType: 1, status: 1 }),
     apiKeys(db).createIndex({ keyHash: 1 }, { unique: true }),
   ]);
 

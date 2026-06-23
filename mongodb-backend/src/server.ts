@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { compress } from 'hono/compress';
 import { authMiddleware } from './auth.js';
 import { getDb } from './db.js';
 import {
@@ -15,6 +16,11 @@ import {
 const app = new Hono();
 
 app.use('*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'], allowHeaders: ['Content-Type', 'X-API-Key'] }));
+
+// gzip/deflate the (large) entries payload. The list view downloads hundreds of
+// rows at once, and the JSON compresses ~5-10x, which is the main remaining
+// load-time cost over higher-latency links.
+app.use('*', compress());
 
 app.get('/health', c => c.json({ ok: true }));
 
@@ -35,10 +41,12 @@ app.get('/entries', async c => {
   const { ownerId } = c.get('auth');
   const userKey = c.req.query('userKey') || '';
   const mediaType = c.req.query('mediaType') as 'anime' | 'manga' | undefined;
+  const statusRaw = c.req.query('status');
+  const status = statusRaw !== undefined && statusRaw !== '' ? Number(statusRaw) : undefined;
 
   try {
     const db = await getDb();
-    const rows = await listEntries(db, ownerId, { userKey, mediaType });
+    const rows = await listEntries(db, ownerId, { userKey, mediaType, status });
     return c.json({ rows });
   } catch (err) {
     return c.json({ error: (err as Error).message }, 400);

@@ -14,6 +14,7 @@ type MongoSyncRow = {
   score: number;
   status: number;
   aliases: string[];
+  updatedAt?: string | number | null;
   [extra: string]: unknown;
 };
 
@@ -31,6 +32,10 @@ type SyncEntryAggregate = {
   score: number;
   status: number;
   sourceUrl: string;
+  updatedAt: number;
+  // Normalized title + altTitle keys, precomputed once so dedup comparisons are
+  // cheap string ops instead of re-running regex normalization per comparison.
+  titleKeys: Set<string>;
 };
 
 export type SyncEntryPayload = {
@@ -137,6 +142,30 @@ function isFuzzyTitleMatch(targetKey: string, rowKey: string): boolean {
   return isExactTitleMatch(targetKey, rowKey) || hasStrongTitleContainment(targetKey, rowKey);
 }
 
+function computeTitleKeys(title: string, altTitles: unknown): Set<string> {
+  const keys = new Set<string>();
+  const titleKey = normalizeTitleKey(title);
+  if (titleKey) keys.add(titleKey);
+  normalizeAltTitles(altTitles).forEach(alt => {
+    const key = normalizeTitleKey(alt);
+    if (key) keys.add(key);
+  });
+  return keys;
+}
+
+// Fuzzy (containment) overlap between an aggregate's precomputed title keys and
+// a row's precomputed keys. Both sides are already normalized, so this is just
+// string comparisons — no per-call regex work.
+function titleKeysContainFuzzy(targetKeys: Set<string>, rowKeys: string[]): boolean {
+  for (const rowKey of rowKeys) {
+    if (targetKeys.has(rowKey)) return true;
+    for (const targetKey of targetKeys) {
+      if (hasStrongTitleContainment(targetKey, rowKey)) return true;
+    }
+  }
+  return false;
+}
+
 function getTitleMergeMode(): 'off' | 'exact' | 'fuzzy' {
   if (api.settings.get('mongoTitleMergeAutomation') !== 'on') return 'off';
   return api.settings.get('mongoTitleMergeStrictness') === 'exact' ? 'exact' : 'fuzzy';
@@ -144,6 +173,15 @@ function getTitleMergeMode(): 'off' | 'exact' | 'fuzzy' {
 
 function isLocalRow(row: MongoSyncRow | SyncEntryAggregate): boolean {
   return row.entryId.startsWith('l:') || row.sourceUrl.startsWith('local://');
+}
+
+function parseUpdatedAt(value: string | number | null | undefined): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
+    const ms = Date.parse(value);
+    return Number.isNaN(ms) ? 0 : ms;
+  }
+  return 0;
 }
 
 function toAggregate(row: MongoSyncRow): SyncEntryAggregate {
@@ -161,6 +199,8 @@ function toAggregate(row: MongoSyncRow): SyncEntryAggregate {
     score: Number(row.score) || 0,
     status: Number(row.status) || 0,
     sourceUrl: row.sourceUrl || '',
+    updatedAt: parseUpdatedAt(row.updatedAt),
+    titleKeys: computeTitleKeys(row.title, row.altTitles),
   };
 }
 
@@ -169,6 +209,7 @@ function mergeAggregate(target: SyncEntryAggregate, incoming: MongoSyncRow) {
     target.aliases.add(alias),
   );
   normalizeAltTitles(incoming.altTitles).forEach(title => target.altTitles.add(title));
+  computeTitleKeys(incoming.title, incoming.altTitles).forEach(key => target.titleKeys.add(key));
 
   const incomingLooksRemote = !isLocalRow(incoming);
   const targetLooksLocal = isLocalRow(target);
@@ -185,37 +226,7 @@ function mergeAggregate(target: SyncEntryAggregate, incoming: MongoSyncRow) {
   target.progress = Math.max(target.progress, Number(incoming.progress) || 0);
   target.volumeProgress = Math.max(target.volumeProgress, Number(incoming.volumeProgress) || 0);
   target.score = Math.max(target.score, Number(incoming.score) || 0);
-}
-
-function overlapsByIds(target: SyncEntryAggregate, row: MongoSyncRow): boolean {
-  const ids = normalizeAliases([row.entryId, ...(row.aliases || [])]);
-  return ids.some(id => target.aliases.has(id));
-}
-
-function overlapsByTitle(
-  target: SyncEntryAggregate,
-  row: MongoSyncRow,
-  titleMergeMode: 'off' | 'exact' | 'fuzzy',
-): boolean {
-  if (titleMergeMode === 'off') return false;
-
-  const targetKeys = new Set<string>(
-    [
-      normalizeTitleKey(target.title),
-      ...[...target.altTitles].map(el => normalizeTitleKey(el)),
-    ].filter(Boolean),
-  );
-  const rowKeys = [
-    normalizeTitleKey(row.title),
-    ...normalizeAltTitles(row.altTitles).map(el => normalizeTitleKey(el)),
-  ].filter(Boolean);
-
-  return rowKeys.some(rowKey => {
-    return [...targetKeys].some(targetKey => {
-      if (titleMergeMode === 'exact') return isExactTitleMatch(targetKey, rowKey);
-      return isFuzzyTitleMatch(targetKey, rowKey);
-    });
-  });
+  target.updatedAt = Math.max(target.updatedAt, parseUpdatedAt(incoming.updatedAt));
 }
 
 function getLibraryKey() {
@@ -329,30 +340,92 @@ export async function getUserObject() {
   }
 }
 
-export async function getSyncList() {
+export async function getSyncList(mediaType?: 'anime' | 'manga', status?: number) {
   const libraryKey = requireLibraryKey();
   const titleMergeMode = getTitleMergeMode();
 
-  const { rows = [] } = await fetchEntriesCached(
-    `/entries?userKey=${encodeURIComponent(libraryKey)}`,
-  );
+  // Fetch only the rows the current list view needs. The list shows one
+  // mediaType (and usually one status) at a time, so filtering server-side
+  // instead of downloading the whole library is the dominant load-time win.
+  let path = `/entries?userKey=${encodeURIComponent(libraryKey)}`;
+  if (mediaType) path += `&mediaType=${encodeURIComponent(mediaType)}`;
+  if (typeof status === 'number') path += `&status=${encodeURIComponent(String(status))}`;
 
-  con.log(logScope, 'getSyncList', { totalRows: rows.length });
+  const { rows = [] } = await fetchEntriesCached(path);
 
+  con.log(logScope, 'getSyncList', { totalRows: rows.length, mediaType, status });
+
+  // Dedup via lookup maps instead of a linear scan per row. A naive
+  // `deduped.find(...)` over every row is O(n²); worse, the fuzzy variant
+  // re-normalized every title on every comparison, which at 1k+ rows costs
+  // several seconds. Id and exact-title overlap reduce to O(1) map lookups, and
+  // the fuzzy containment scan compares precomputed (already-normalized) keys.
   const deduped: SyncEntryAggregate[] = [];
+  const aliasIndex = new Map<string, SyncEntryAggregate>();
+  const titleIndex = titleMergeMode !== 'off' ? new Map<string, SyncEntryAggregate>() : null;
+
+  const indexKey = (mediaType: string, value: string) => `${mediaType} ${value}`;
+
+  const registerAliases = (agg: SyncEntryAggregate) => {
+    agg.aliases.forEach(alias => aliasIndex.set(indexKey(agg.mediaType, alias), agg));
+  };
+  const registerTitles = (agg: SyncEntryAggregate) => {
+    if (!titleIndex) return;
+    agg.titleKeys.forEach(key => titleIndex.set(indexKey(agg.mediaType, key), agg));
+  };
+
   rows.forEach(row => {
-    const match = deduped.find(
-      candidate =>
-        candidate.mediaType === row.mediaType &&
-        (overlapsByIds(candidate, row) || overlapsByTitle(candidate, row, titleMergeMode)),
-    );
+    let match: SyncEntryAggregate | undefined;
+
+    const rowIds = normalizeAliases([row.entryId, ...(row.aliases || [])]);
+    for (const id of rowIds) {
+      const found = aliasIndex.get(indexKey(row.mediaType, id));
+      if (found) {
+        match = found;
+        break;
+      }
+    }
+
+    // Precompute the row's normalized title keys once, reused for both the exact
+    // index lookup and the fuzzy containment scan.
+    const rowTitleKeys = titleIndex ? [...computeTitleKeys(row.title, row.altTitles)] : [];
+
+    if (!match && titleIndex) {
+      for (const key of rowTitleKeys) {
+        const found = titleIndex.get(indexKey(row.mediaType, key));
+        if (found) {
+          match = found;
+          break;
+        }
+      }
+    }
+
+    // Containment can't be indexed, so this still scans — but only for rows that
+    // didn't match by id or exact title, and each comparison is a cheap string
+    // op over precomputed keys rather than a fresh normalization pass.
+    if (!match && titleMergeMode === 'fuzzy' && rowTitleKeys.length) {
+      for (const candidate of deduped) {
+        if (candidate.mediaType !== row.mediaType) continue;
+        if (titleKeysContainFuzzy(candidate.titleKeys, rowTitleKeys)) {
+          match = candidate;
+          break;
+        }
+      }
+    }
 
     if (!match) {
-      deduped.push(toAggregate(row));
+      const agg = toAggregate(row);
+      deduped.push(agg);
+      registerAliases(agg);
+      registerTitles(agg);
       return;
     }
 
     mergeAggregate(match, row);
+    // mergeAggregate can absorb new aliases/altTitles (and promote a local row's
+    // entryId to a remote one), so re-register the merged keys.
+    registerAliases(match);
+    registerTitles(match);
   });
 
   return deduped.reduce((acc, row) => {
@@ -367,6 +440,7 @@ export async function getSyncList() {
       score: row.score,
       status: row.status,
       sourceUrl: row.sourceUrl,
+      updatedAt: row.updatedAt,
     };
     return acc;
   }, {} as Record<string, any>);

@@ -2,8 +2,28 @@ import { storageInterface } from './storageInterface';
 
 declare let i18n: string[];
 
+// Scoped snapshot of chrome.storage.local used to collapse the thousands of
+// per-item reads a large list build would otherwise issue into a single bulk
+// read. Only local keys are served from it; sync keys always bypass. A TTL
+// guards against a snapshot that was never cleared (e.g. an exception mid-build)
+// leaking stale reads into the rest of the app.
+let localReadCache: { [key: string]: any } | null = null;
+let localReadCacheTs = 0;
+const LOCAL_READ_CACHE_TTL = 15000;
+
+function localReadCacheValid() {
+  if (!localReadCache) return false;
+  if (Date.now() - localReadCacheTs > LOCAL_READ_CACHE_TTL) {
+    localReadCache = null;
+    return false;
+  }
+  return true;
+}
+
 export const webextension: storageInterface = {
   async set(key: string, value: string): Promise<void> {
+    // A write makes the bulk-read snapshot stale; drop it so reads stay correct.
+    localReadCache = null;
     const obj = {} as any;
     obj[key] = value;
     return new Promise((resolve, reject) => {
@@ -18,6 +38,9 @@ export const webextension: storageInterface = {
   },
 
   async get(key: string): Promise<any> {
+    if (localReadCacheValid() && !utils.syncRegex.test(key)) {
+      return localReadCache![key];
+    }
     return new Promise((resolve, reject) => {
       getStorage(key).get(key, function (results) {
         if (chrome.runtime.lastError) {
@@ -29,7 +52,19 @@ export const webextension: storageInterface = {
     });
   },
 
+  async primeReadCache(): Promise<void> {
+    localReadCache = await new Promise(resolve => {
+      chrome.storage.local.get(null, results => resolve(results || {}));
+    });
+    localReadCacheTs = Date.now();
+  },
+
+  clearReadCache(): void {
+    localReadCache = null;
+  },
+
   async remove(key: string): Promise<void> {
+    localReadCache = null;
     return new Promise((resolve, reject) => {
       getStorage(key).remove(key, function () {
         if (chrome.runtime.lastError) {

@@ -1,4 +1,6 @@
 import { MetaOverviewAbstract } from '../metaOverviewAbstract';
+import { MetaOverview as AniListMeta } from '../AniList/metaOverview';
+import { Cache } from '../../utils/Cache';
 import * as helper from './helper';
 
 export class MetaOverview extends MetaOverviewAbstract {
@@ -18,9 +20,17 @@ export class MetaOverview extends MetaOverviewAbstract {
 
   private readonly entryId: string;
 
-  // Build the overview from the entry's own stored metadata (inherited from an
-  // external source like AniList). No network beyond the entry read, and a
-  // missing field simply renders nothing.
+  // Key the cache by entryId (not the full url), so the two ways an entry is
+  // opened — the in-page float button (url carries the title) and the library
+  // card (title-less key) — share one cached overview. Short TTL so a freshly
+  // inherited source shows up almost immediately; the heavy AniList fetch is
+  // still cached separately under its own url.
+  getCache() {
+    if (this.cacheObj) return this.cacheObj;
+    this.cacheObj = new Cache(`mongoMeta/${this.type}/${this.entryId}`, 10 * 1000);
+    return this.cacheObj;
+  }
+
   async _init() {
     if (!this.entryId) return this;
 
@@ -35,6 +45,24 @@ export class MetaOverview extends MetaOverviewAbstract {
     }
     if (!entry) return this;
 
+    // Preferred path: the entry carries a canonical tracker id (added when its
+    // metadata was inherited), so render the full external overview — characters,
+    // recommendations, related, statistics and all sidebar info — instead of the
+    // handful of fields stored locally. AniList's overview also parses MAL urls.
+    const canonicalUrl = this.canonicalUrlFromAliases(entry.aliases || []);
+    if (canonicalUrl) {
+      try {
+        const ov = await new AniListMeta(canonicalUrl).init();
+        this.meta = ov.getMeta();
+        this.logger.log('overview via canonical source', { canonicalUrl });
+        return this;
+      } catch (e) {
+        this.logger.error('canonical overview failed, falling back to stored fields', e);
+      }
+    }
+
+    // Fallback: no canonical link, so build a minimal overview from the fields
+    // stored on the entry itself.
     if (entry.name) this.meta.title = entry.name;
     if (entry.description) this.meta.description = entry.description;
     if (entry.image) {
@@ -51,11 +79,9 @@ export class MetaOverview extends MetaOverviewAbstract {
         body: String(entry.communityScore),
       });
     }
-
     if (entry.year) {
       this.meta.info.push({ title: 'Year', body: [{ text: String(entry.year) }] });
     }
-
     if (this.type === 'anime' && entry.totalEp) {
       this.meta.info.push({
         title: api.storage.lang('overview_sidebar_Episodes'),
@@ -65,13 +91,20 @@ export class MetaOverview extends MetaOverviewAbstract {
     if (this.type === 'manga' && entry.totalVol) {
       this.meta.info.push({ title: 'Volumes', body: [{ text: String(entry.totalVol) }] });
     }
-
     const genres = (entry.genres || []).filter(Boolean);
     if (genres.length) {
       this.meta.info.push({ title: 'Genres', body: genres.map(genre => ({ text: genre })) });
     }
 
-    this.logger.log('overview', this.meta);
     return this;
+  }
+
+  private canonicalUrlFromAliases(aliases: string[]): string {
+    // Prefer AniList (richest overview), fall back to a MAL id.
+    const ani = aliases.find(alias => /^anilist:\d+$/i.test(alias));
+    if (ani) return `https://anilist.co/${this.type}/${ani.split(':')[1]}`;
+    const mal = aliases.find(alias => /^mal:\d+$/i.test(alias));
+    if (mal) return `https://myanimelist.net/${this.type}/${mal.split(':')[1]}`;
+    return '';
   }
 }

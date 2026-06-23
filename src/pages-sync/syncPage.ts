@@ -13,6 +13,7 @@ import { status } from '../_provider/definitions';
 import { getTrackingMode, TrackingModeType } from './trackingMode';
 import type { ProgressElement, TrackingModeInterface } from './trackingMode/TrackingModeInterface';
 import { getSyncMode } from '../_provider/helper';
+import { getOverview } from '../_provider/metaDataFactory';
 import {
   resumeMessageElement,
   trackingBarElement,
@@ -170,6 +171,7 @@ export class SyncPage {
     this.setSearchObj(undefined);
     this.url = curUrl;
     this.browsingtime = Date.now();
+    this.enrichRan = false;
     let tempSingle;
 
     if (this.page.isSyncPage(this.url)) {
@@ -315,7 +317,10 @@ export class SyncPage {
         if (e instanceof UrlNotSupportedError) {
           this.incorrectUrl();
           throw e;
-        } else if (e instanceof NotFoundError && (syncMode === 'SPACETIMEDB' || syncMode === 'MONGODB')) {
+        } else if (
+          e instanceof NotFoundError &&
+          (syncMode === 'SPACETIMEDB' || syncMode === 'MONGODB')
+        ) {
           logger.log(`${syncMode} Fallback`);
           tempSingle = getSingle(fallbackUrl);
           await tempSingle.update();
@@ -386,7 +391,138 @@ export class SyncPage {
       }
 
       this.imageFallback(state);
+
+      // Storage-only providers (MongoDB/SpaceTimeDB) key entries by the source
+      // page identifier, so the same show on two sites stays unlinked and is
+      // only findable by the one title it was scraped under. Stamp the resolved
+      // AniList/MAL synonyms + canonical id onto the entry so the library search
+      // finds it by any title and the same canonical id links sources together.
+      // Fire-and-forget: it must never delay or break the sync flow.
+      this.enrichLinkBasedEntry(fallbackUrl).catch(e => logger.m('Enrich').error(e));
     }
+  }
+
+  // Adds AniList/MAL synonyms (as altTitles) and a canonical id alias to a
+  // MongoDB/SpaceTimeDB entry that is on the list but not yet enriched. Runs at
+  // most once per entry per page load and is a no-op once a canonical alias is
+  // present. The write goes through an isolated single instance so the active
+  // sync flow's in-memory state (episode, etc.) is never touched.
+  protected enrichRan = false;
+
+  protected async enrichLinkBasedEntry(canonicalUrl: string) {
+    if (this.enrichRan) return;
+
+    const syncMode = getSyncMode(this.page.type);
+    if (syncMode !== 'MONGODB' && syncMode !== 'SPACETIMEDB') return;
+    if (!canonicalUrl) return;
+
+    const single = this.singleObj;
+    const search = this.searchObj;
+    if (!single || !search) return;
+    if (typeof single.getLinkedAliases !== 'function') return;
+    if (typeof single.isOnList !== 'function' || !single.isOnList()) return;
+
+    // Cheap early-out: if the entry already carries a canonical alias it has
+    // been enriched before, so skip the remote lookups entirely.
+    const existingAliases: string[] = single.getLinkedAliases() || [];
+    if (existingAliases.some(a => /^(anilist|mal|kitsu|simkl|shiki|url):/i.test(a))) {
+      this.enrichRan = true;
+      return;
+    }
+
+    // Resolve the canonical match. On already-tracked entries search() resolves
+    // via the local provider and getUrl() is empty, so fall back to an explicit
+    // remote lookup.
+    let matchUrl = search.getUrl();
+    let matchId = search.getId();
+    if (!matchUrl) {
+      const res = await search.searchForIt().catch(() => false);
+      if (res && res.url && res.similarity && res.similarity.same) {
+        matchUrl = res.url;
+        matchId = res.id || 0;
+      }
+    }
+    if (!matchUrl || /^(mongo|stdb|local):\/\//i.test(matchUrl)) return;
+
+    // Only enrich from a real tracker match (AniList/MAL/...). Page-search can
+    // fall back to a streaming-site url, which is no canonical identity.
+    if (!/anilist\.co|myanimelist\.net|kitsu|simkl\.com|shikimori/i.test(matchUrl)) return;
+
+    const alias = this.canonicalAlias(matchUrl, matchId);
+    if (alias && existingAliases.includes(alias)) {
+      this.enrichRan = true;
+      return;
+    }
+
+    // Pull synonyms from the match's own metadata provider (by url domain).
+    let metaTitle = '';
+    let synonyms: string[] = [];
+    try {
+      const overview = getOverview(matchUrl, this.page.type, this.overviewModeForUrl(matchUrl));
+      await overview.init();
+      const meta = overview.getMeta();
+      metaTitle = meta.title || '';
+      synonyms = [meta.title, ...(meta.alternativeTitle || [])].filter(Boolean);
+    } catch (e) {
+      logger.m('Enrich').error('meta lookup failed', e);
+    }
+
+    const existingAlt: string[] =
+      typeof single.getAlternativeTitles === 'function' ? single.getAlternativeTitles() : [];
+    const newAlt = synonyms.filter(s => !existingAlt.includes(s));
+
+    // Nothing new to persist.
+    if (!alias && !newAlt.length) {
+      this.enrichRan = true;
+      return;
+    }
+
+    this.enrichRan = true;
+
+    // Isolated single: do the link/sync here so the active singleObj keeps the
+    // episode the sync flow is about to write.
+    const enrichSingle: any = getSingle(canonicalUrl);
+    await enrichSingle.update();
+    if (!enrichSingle.isOnList() || typeof enrichSingle.linkSearchCandidate !== 'function') return;
+
+    logger.m('Enrich').log('Stamping canonical identity', {
+      alias,
+      newSynonyms: newAlt.length,
+      matchUrl,
+    });
+    await enrichSingle.linkSearchCandidate({
+      aliases: alias ? [alias] : [],
+      altTitles: [...existingAlt, ...newAlt],
+      title: metaTitle,
+    });
+  }
+
+  // Picks the metadata provider for a resolved match url by its domain, so a MAL
+  // url uses MAL meta and an AniList url uses AniList meta (rather than whatever
+  // the active sync mode would otherwise default to).
+  protected overviewModeForUrl(url: string): string {
+    const lower = url.toLowerCase();
+    if (lower.includes('anilist.co')) return 'ANILIST';
+    if (lower.includes('myanimelist.net')) return 'MAL';
+    if (lower.includes('kitsu')) return 'KITSU';
+    if (lower.includes('simkl.com')) return 'SIMKL';
+    if (lower.includes('shikimori')) return 'SHIKI';
+    return getSyncMode(this.page.type);
+  }
+
+  // Builds a stable cross-source alias from a resolved match url + id, e.g.
+  // "anilist:178680". Falls back to a url-based alias when no numeric id exists.
+  protected canonicalAlias(url: string, id: number): string {
+    const lower = url.toLowerCase();
+    const numericId = Number(id) || parseInt(utils.urlPart(url, 4)) || 0;
+    if (numericId) {
+      if (lower.includes('anilist.co')) return `anilist:${numericId}`;
+      if (lower.includes('myanimelist.net')) return `mal:${numericId}`;
+      if (lower.includes('kitsu')) return `kitsu:${numericId}`;
+      if (lower.includes('simkl.com')) return `simkl:${numericId}`;
+      if (lower.includes('shikimori')) return `shiki:${numericId}`;
+    }
+    return url ? `url:${utils.urlStrip(url)}` : '';
   }
 
   protected async startSyncHandling(state, malUrl) {

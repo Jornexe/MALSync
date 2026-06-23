@@ -25,6 +25,12 @@ export type UpsertPayload = {
   volumeProgress: number;
   score: number;
   status: number;
+  totalEp?: number;
+  totalVol?: number;
+  description?: string;
+  year?: number;
+  genres?: string[];
+  communityScore?: number;
   [extra: string]: unknown;
 };
 
@@ -82,6 +88,12 @@ function extraFields(payload: Record<string, unknown>): Record<string, unknown> 
     'volumeProgress',
     'score',
     'status',
+    'totalEp',
+    'totalVol',
+    'description',
+    'year',
+    'genres',
+    'communityScore',
   ]);
   const extras: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(payload)) {
@@ -175,6 +187,23 @@ export async function upsertEntry(
     updatedAt: new Date(),
     ...extraFields(payload as Record<string, unknown>),
   };
+
+  // Rich metadata: the client already applied its fill/replace strictness, so
+  // take the incoming value when present and otherwise keep what's stored.
+  // Empty/absent values never clear an existing field.
+  const setRich = (key: keyof SyncEntryDoc, existingVal: unknown, incomingVal: unknown) => {
+    const value = resolvedByTitle ? (existingVal ?? incomingVal) : (incomingVal ?? existingVal);
+    if (value === undefined || value === null) return;
+    if (Array.isArray(value) && value.length === 0) return;
+    if (typeof value === 'string' && !value.trim()) return;
+    (nextDoc as Record<string, unknown>)[key as string] = value;
+  };
+  setRich('totalEp', existing?.totalEp, payload.totalEp);
+  setRich('totalVol', existing?.totalVol, payload.totalVol);
+  setRich('description', existing?.description, normalizeValue(payload.description));
+  setRich('year', existing?.year, payload.year);
+  setRich('genres', existing?.genres, normalizeStringArray(payload.genres));
+  setRich('communityScore', existing?.communityScore, payload.communityScore);
 
   await col.updateOne(
     { ownerId, userKey, mediaType: payload.mediaType, entryId: baseEntryId },

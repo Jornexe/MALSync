@@ -14,6 +14,12 @@ type MongoSyncRow = {
   score: number;
   status: number;
   aliases: string[];
+  totalEp?: number;
+  totalVol?: number;
+  description?: string;
+  year?: number;
+  genres?: string[];
+  communityScore?: number;
   updatedAt?: string | number | null;
   [extra: string]: unknown;
 };
@@ -33,6 +39,12 @@ type SyncEntryAggregate = {
   status: number;
   sourceUrl: string;
   updatedAt: number;
+  totalEp: number;
+  totalVol: number;
+  description: string;
+  year: number;
+  genres: Set<string>;
+  communityScore: number;
   // Normalized title + altTitle keys, precomputed once so dedup comparisons are
   // cheap string ops instead of re-running regex normalization per comparison.
   titleKeys: Set<string>;
@@ -52,6 +64,12 @@ export type SyncEntryPayload = {
   volumeProgress: number;
   score: number;
   status: number;
+  totalEp?: number;
+  totalVol?: number;
+  description?: string;
+  year?: number;
+  genres?: string[];
+  communityScore?: number;
 };
 
 export type SyncEntryLinkPayload = {
@@ -200,6 +218,12 @@ function toAggregate(row: MongoSyncRow): SyncEntryAggregate {
     status: Number(row.status) || 0,
     sourceUrl: row.sourceUrl || '',
     updatedAt: parseUpdatedAt(row.updatedAt),
+    totalEp: Number(row.totalEp) || 0,
+    totalVol: Number(row.totalVol) || 0,
+    description: row.description || '',
+    year: Number(row.year) || 0,
+    genres: new Set(normalizeAltTitles(row.genres)),
+    communityScore: Number(row.communityScore) || 0,
     titleKeys: computeTitleKeys(row.title, row.altTitles),
   };
 }
@@ -222,10 +246,16 @@ function mergeAggregate(target: SyncEntryAggregate, incoming: MongoSyncRow) {
   if (!target.tags && incoming.tags) target.tags = incoming.tags;
   if (!target.streamingUrl && incoming.streamingUrl) target.streamingUrl = incoming.streamingUrl;
   if (!target.image && incoming.image) target.image = incoming.image;
+  if (!target.description && incoming.description) target.description = incoming.description;
+  normalizeAltTitles(incoming.genres).forEach(genre => target.genres.add(genre));
 
   target.progress = Math.max(target.progress, Number(incoming.progress) || 0);
   target.volumeProgress = Math.max(target.volumeProgress, Number(incoming.volumeProgress) || 0);
   target.score = Math.max(target.score, Number(incoming.score) || 0);
+  target.totalEp = Math.max(target.totalEp, Number(incoming.totalEp) || 0);
+  target.totalVol = Math.max(target.totalVol, Number(incoming.totalVol) || 0);
+  target.year = target.year || Number(incoming.year) || 0;
+  target.communityScore = Math.max(target.communityScore, Number(incoming.communityScore) || 0);
   target.updatedAt = Math.max(target.updatedAt, parseUpdatedAt(incoming.updatedAt));
 }
 
@@ -441,6 +471,12 @@ export async function getSyncList(mediaType?: 'anime' | 'manga', status?: number
       status: row.status,
       sourceUrl: row.sourceUrl,
       updatedAt: row.updatedAt,
+      totalEp: row.totalEp,
+      totalVol: row.totalVol,
+      description: row.description,
+      year: row.year,
+      genres: [...row.genres],
+      communityScore: row.communityScore,
     };
     return acc;
   }, {} as Record<string, any>);
@@ -510,6 +546,12 @@ export async function getEntry(
     score: row.score,
     status: row.status,
     sourceUrl: row.sourceUrl,
+    totalEp: Number(row.totalEp) || 0,
+    totalVol: Number(row.totalVol) || 0,
+    description: row.description || '',
+    year: Number(row.year) || 0,
+    genres: normalizeAltTitles(row.genres),
+    communityScore: Number(row.communityScore) || 0,
   };
 }
 
@@ -534,6 +576,12 @@ export async function upsertEntry(payload: SyncEntryPayload) {
       volumeProgress: payload.volumeProgress,
       score: payload.score,
       status: payload.status,
+      totalEp: payload.totalEp,
+      totalVol: payload.totalVol,
+      description: payload.description,
+      year: payload.year,
+      genres: normalizeAltTitles(payload.genres),
+      communityScore: payload.communityScore,
     }),
   });
 

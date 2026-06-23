@@ -16,6 +16,16 @@ export type SyncEntryDoc = {
   volumeProgress: number;
   score: number;
   status: number;
+  // Optional rich metadata inherited from an external source (e.g. AniList/MAL).
+  // Kept separate from the user-owned fields above: `genres` is its own field
+  // (never folded into `tags`, which stores per-entry settings) and
+  // `communityScore` is distinct from the user's own `score`.
+  totalEp?: number;
+  totalVol?: number;
+  description?: string;
+  year?: number;
+  genres?: string[];
+  communityScore?: number;
   updatedAt: Date;
   [extra: string]: unknown;
 };

@@ -177,11 +177,28 @@ export class Single extends SingleAbstract {
   }
 
   _getTotalEpisodes() {
-    return 0;
+    return Number(this.animeInfo?.totalEp) || 0;
   }
 
   _getTotalVolumes() {
-    return 0;
+    return Number(this.animeInfo?.totalVol) || 0;
+  }
+
+  // Rich metadata inherited from an external source, surfaced for the overview.
+  getDescription(): string {
+    return this.animeInfo?.description || '';
+  }
+
+  getGenres(): string[] {
+    return normalizeAltTitles(this.animeInfo?.genres);
+  }
+
+  getYear(): number {
+    return Number(this.animeInfo?.year) || 0;
+  }
+
+  getCommunityScore(): number {
+    return Number(this.animeInfo?.communityScore) || 0;
   }
 
   _getDisplayUrl() {
@@ -279,6 +296,12 @@ export class Single extends SingleAbstract {
       volumeProgress: Number(this.animeInfo.volumeprogress) || 0,
       score: Number(this.animeInfo.score) || 0,
       status: Number(this.animeInfo.status) || definitions.status.PlanToWatch,
+      totalEp: Number(this.animeInfo.totalEp) || 0,
+      totalVol: Number(this.animeInfo.totalVol) || 0,
+      description: this.animeInfo.description || '',
+      year: Number(this.animeInfo.year) || 0,
+      genres: normalizeAltTitles(this.animeInfo.genres),
+      communityScore: Number(this.animeInfo.communityScore) || 0,
     });
   }
 
@@ -321,17 +344,65 @@ export class Single extends SingleAbstract {
     altTitles?: string[];
     title?: string;
     image?: string;
+    meta?: {
+      totalEp?: number;
+      totalVol?: number;
+      genres?: string[];
+      description?: string;
+      year?: number;
+      communityScore?: number;
+    };
   }) {
-    // Inherit metadata from the chosen source (e.g. an AniList/MAL result):
-    // adopt its cover image, and its title when the entry has none of its own.
-    if (payload.image) this.animeInfo.image = payload.image;
-    if (payload.title && (!this.animeInfo.name || this.animeInfo.name === this.entryId)) {
-      this.animeInfo.name = payload.title;
+    // Inherit metadata from the chosen source (e.g. an AniList/MAL result).
+    // Strictness: "replace" overwrites, "fill" only fills blanks. Synonyms are
+    // always merged; the user's tags and personal score are never touched here.
+    const replace = api.settings.get('mongoInheritStrictness') === 'replace';
+    const fillStr = (current: string, incoming: string) =>
+      incoming && (replace || !current) ? incoming : current;
+    const fillNum = (current: number, incoming: number) =>
+      incoming && (replace || !current) ? incoming : current;
+
+    if (payload.image) this.animeInfo.image = fillStr(this.animeInfo.image || '', payload.image);
+
+    if (payload.title) {
+      const hasOwnTitle = this.animeInfo.name && this.animeInfo.name !== this.entryId;
+      if (replace || !hasOwnTitle) this.animeInfo.name = payload.title;
     }
+
+    const meta = payload.meta || {};
+    this.animeInfo.totalEp = fillNum(
+      Number(this.animeInfo.totalEp) || 0,
+      Number(meta.totalEp) || 0,
+    );
+    this.animeInfo.totalVol = fillNum(
+      Number(this.animeInfo.totalVol) || 0,
+      Number(meta.totalVol) || 0,
+    );
+    this.animeInfo.year = fillNum(Number(this.animeInfo.year) || 0, Number(meta.year) || 0);
+    this.animeInfo.communityScore = fillNum(
+      Number(this.animeInfo.communityScore) || 0,
+      Number(meta.communityScore) || 0,
+    );
+    this.animeInfo.description = fillStr(this.animeInfo.description || '', meta.description || '');
+
+    const incomingGenres = normalizeAltTitles(meta.genres);
+    if (incomingGenres.length) {
+      this.animeInfo.genres = replace
+        ? incomingGenres
+        : normalizeAltTitles([...(this.animeInfo.genres || []), ...incomingGenres]);
+    }
+
+    // Synonyms are additive: merge incoming alt titles (and the source title)
+    // into the entry and persist them with the main write, not only via /link.
+    const altTitles = normalizeAltTitles([
+      ...(this.animeInfo.altTitles || []),
+      ...(payload.altTitles || []),
+      payload.title || '',
+    ]);
+    this.animeInfo.altTitles = altTitles;
 
     await this.sync();
 
-    const altTitles = normalizeAltTitles([...(payload.altTitles || []), payload.title || '']);
     const aliases = normalizeAliases(payload.aliases || []);
 
     await helper.linkEntry({

@@ -33,6 +33,8 @@ export const search: searchInterface = async function (
           type
           format
           averageScore
+          genres
+          description
           startDate {
             year
           }
@@ -70,6 +72,10 @@ export const search: searchInterface = async function (
       score: item.averageScore,
       year: item.startDate.year,
       totalEp: item.episodes || item.chapters || 0,
+      totalVol: 0,
+      genres: Array.isArray(item.genres) ? item.genres : [],
+      description: item.description || '',
+      communityScore: item.averageScore || 0,
     });
   });
 

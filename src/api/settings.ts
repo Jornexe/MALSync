@@ -139,6 +139,7 @@ export const settingsObj = {
     mongoProfileConfirmSkip: false,
     mongoTitleMergeAutomation: 'on',
     mongoTitleMergeStrictness: 'fuzzy',
+    mongoInheritStrictness: 'fill',
 
     shikiToken: '',
     shikiOptions: {

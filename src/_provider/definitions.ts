@@ -64,6 +64,10 @@ export type searchResult = {
   score: string;
   year: string;
   totalEp?: number;
+  totalVol?: number;
+  genres?: string[];
+  description?: string;
+  communityScore?: number;
   list?: {
     status: status;
     score: score;

@@ -222,6 +222,16 @@ export default {
               altTitles: Array.isArray(item?.altNames) ? item.altNames : [],
               title: item?.name || '',
               image: isExternalSource ? item?.imageLarge || item?.image || '' : undefined,
+              meta: isExternalSource
+                ? {
+                    totalEp: Number(item?.totalEp) || 0,
+                    totalVol: Number(item?.totalVol) || 0,
+                    genres: Array.isArray(item?.genres) ? item.genres : [],
+                    description: item?.description || '',
+                    year: Number(item?.year) || 0,
+                    communityScore: Number(item?.communityScore ?? item?.score) || 0,
+                  }
+                : undefined,
             });
           }
 

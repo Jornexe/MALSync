@@ -67,7 +67,11 @@ export class UserList extends ListAbstract {
         continue;
       }
 
-      const sourceUrl = el.sourceUrl || `local://mongodb/${listType}/${encodeURIComponent(el.name)}`;
+      // Link the card to the entry's own overview page (mongo:// key) rather than
+      // the raw streaming source, so it opens the rich detail view like other
+      // providers. The streaming link stays reachable via the card's stream pill
+      // (sourced from sUrl below) and the overview's external link.
+      const overviewUrl = key;
 
       if (listType === 'anime') {
         tasks.push(
@@ -84,10 +88,10 @@ export class UserList extends ListAbstract {
               tags: el.tags,
               title: el.name,
               altTitles: Array.isArray(el.altTitles) ? el.altTitles : [],
-              url: sourceUrl,
+              url: overviewUrl,
               score: Number(el.score) || 0,
               watchedEp: Number(el.progress) || 0,
-              totalEp: 0,
+              totalEp: Number(el.totalEp) || 0,
               status: Number(el.status) || definitions.status.PlanToWatch,
               startDate: null,
               finishDate: null,
@@ -112,12 +116,12 @@ export class UserList extends ListAbstract {
               tags: el.tags,
               title: el.name,
               altTitles: Array.isArray(el.altTitles) ? el.altTitles : [],
-              url: sourceUrl,
+              url: overviewUrl,
               score: Number(el.score) || 0,
               watchedEp: Number(el.progress) || 0,
               readVol: Number(el.volumeprogress) || 0,
-              totalEp: 0,
-              totalVol: 0,
+              totalEp: Number(el.totalEp) || 0,
+              totalVol: Number(el.totalVol) || 0,
               status: Number(el.status) || definitions.status.PlanToWatch,
               startDate: null,
               finishDate: null,

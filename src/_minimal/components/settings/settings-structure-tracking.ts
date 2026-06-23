@@ -170,16 +170,14 @@ export const trackingSimple: ConfObj[] = [
     key: 'mongoProfile',
     title: () => 'MongoDB Profile',
     condition: () =>
-      api.settings.get('syncMode') === 'MONGODB' ||
-      api.settings.get('syncModeSimkl') === 'MONGODB',
+      api.settings.get('syncMode') === 'MONGODB' || api.settings.get('syncModeSimkl') === 'MONGODB',
     component: SettingsMongoProfile,
   },
   {
     key: 'mongoServerUrl',
     title: () => 'MongoDB Server URL',
     condition: () =>
-      api.settings.get('syncMode') === 'MONGODB' ||
-      api.settings.get('syncModeSimkl') === 'MONGODB',
+      api.settings.get('syncMode') === 'MONGODB' || api.settings.get('syncModeSimkl') === 'MONGODB',
     props: {
       component: 'input',
       option: 'mongoServerUrl',
@@ -193,8 +191,7 @@ export const trackingSimple: ConfObj[] = [
     key: 'mongoApiKey',
     title: () => 'MongoDB API Key',
     condition: () =>
-      api.settings.get('syncMode') === 'MONGODB' ||
-      api.settings.get('syncModeSimkl') === 'MONGODB',
+      api.settings.get('syncMode') === 'MONGODB' || api.settings.get('syncModeSimkl') === 'MONGODB',
     props: {
       component: 'input',
       option: 'mongoApiKey',
@@ -208,8 +205,7 @@ export const trackingSimple: ConfObj[] = [
     key: 'mongoTitleMergeAutomation',
     title: () => 'MongoDB Title Merge Automation',
     condition: () =>
-      api.settings.get('syncMode') === 'MONGODB' ||
-      api.settings.get('syncModeSimkl') === 'MONGODB',
+      api.settings.get('syncMode') === 'MONGODB' || api.settings.get('syncModeSimkl') === 'MONGODB',
     props: {
       component: 'dropdown',
       option: 'mongoTitleMergeAutomation',
@@ -242,6 +238,25 @@ export const trackingSimple: ConfObj[] = [
       },
       tooltip:
         'Exact is safer for similarly named manga. Fuzzy is more automatic but can merge close title variants.',
+    },
+    component: SettingsGeneral,
+  },
+  {
+    key: 'mongoInheritStrictness',
+    title: () => 'MongoDB Metadata Inheritance',
+    condition: () =>
+      api.settings.get('syncMode') === 'MONGODB' || api.settings.get('syncModeSimkl') === 'MONGODB',
+    props: {
+      component: 'dropdown',
+      option: 'mongoInheritStrictness',
+      props: {
+        options: [
+          { title: 'Fill missing only', value: 'fill' },
+          { title: 'Replace with source', value: 'replace' },
+        ],
+      },
+      tooltip:
+        'When importing metadata from an external source (e.g. AniList) into an entry: "Fill missing only" keeps your existing values and fills blanks; "Replace with source" overwrites them. Synonyms are always merged; your tags and personal score are never touched.',
     },
     component: SettingsGeneral,
   },

@@ -31,6 +31,12 @@ export type UpsertPayload = {
   year?: number;
   genres?: string[];
   communityScore?: number;
+  format?: string;
+  airStatus?: string;
+  season?: string;
+  duration?: number;
+  studios?: string[];
+  characters?: { name: string; img: string; url: string; subtext: string }[];
   [extra: string]: unknown;
 };
 
@@ -94,6 +100,12 @@ function extraFields(payload: Record<string, unknown>): Record<string, unknown> 
     'year',
     'genres',
     'communityScore',
+    'format',
+    'airStatus',
+    'season',
+    'duration',
+    'studios',
+    'characters',
   ]);
   const extras: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(payload)) {
@@ -204,6 +216,16 @@ export async function upsertEntry(
   setRich('year', existing?.year, payload.year);
   setRich('genres', existing?.genres, normalizeStringArray(payload.genres));
   setRich('communityScore', existing?.communityScore, payload.communityScore);
+  setRich('format', existing?.format, normalizeValue(payload.format));
+  setRich('airStatus', existing?.airStatus, normalizeValue(payload.airStatus));
+  setRich('season', existing?.season, normalizeValue(payload.season));
+  setRich('duration', existing?.duration, payload.duration);
+  setRich('studios', existing?.studios, normalizeStringArray(payload.studios));
+  setRich(
+    'characters',
+    existing?.characters,
+    Array.isArray(payload.characters) ? payload.characters : undefined,
+  );
 
   await col.updateOne(
     { ownerId, userKey, mediaType: payload.mediaType, entryId: baseEntryId },

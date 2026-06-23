@@ -22,9 +22,8 @@ export class MetaOverview extends MetaOverviewAbstract {
 
   // Key the cache by entryId (not the full url), so the two ways an entry is
   // opened — the in-page float button (url carries the title) and the library
-  // card (title-less key) — share one cached overview. Short TTL so a freshly
-  // inherited source shows up almost immediately; the heavy AniList fetch is
-  // still cached separately under its own url.
+  // card (title-less key) — share one cached overview. Short TTL so freshly
+  // inherited data shows up quickly; the heavy live fetch is cached separately.
   getCache() {
     if (this.cacheObj) return this.cacheObj;
     this.cacheObj = new Cache(`mongoMeta/${this.type}/${this.entryId}`, 10 * 1000);
@@ -45,24 +44,27 @@ export class MetaOverview extends MetaOverviewAbstract {
     }
     if (!entry) return this;
 
-    // Preferred path: the entry carries a canonical tracker id (added when its
-    // metadata was inherited), so render the full external overview — characters,
-    // recommendations, related, statistics and all sidebar info — instead of the
-    // handful of fields stored locally. AniList's overview also parses MAL urls.
+    // Stored data first: build the overview from what the entry owns.
+    this.applyStored(entry);
+
+    // Then fill the gaps from the canonical source (recommendations, related,
+    // reviews, banner, and any field the entry doesn't store).
     const canonicalUrl = this.canonicalUrlFromAliases(entry.aliases || []);
     if (canonicalUrl) {
       try {
-        const ov = await new AniListMeta(canonicalUrl).init();
-        this.meta = ov.getMeta();
-        this.logger.log('overview via canonical source', { canonicalUrl });
-        return this;
+        const live = (await new AniListMeta(canonicalUrl).init()).getMeta();
+        this.fillGaps(live);
       } catch (e) {
-        this.logger.error('canonical overview failed, falling back to stored fields', e);
+        this.logger.error('live gap-fill failed', e);
       }
     }
 
-    // Fallback: no canonical link, so build a minimal overview from the fields
-    // stored on the entry itself.
+    return this;
+  }
+
+  private applyStored(entry) {
+    const lang = api.storage.lang;
+
     if (entry.name) this.meta.title = entry.name;
     if (entry.description) this.meta.description = entry.description;
     if (entry.image) {
@@ -73,30 +75,82 @@ export class MetaOverview extends MetaOverviewAbstract {
     const altTitles = (entry.altTitles || []).filter(Boolean);
     if (altTitles.length) this.meta.alternativeTitle = altTitles;
 
+    const characters = (entry.characters || []).filter(character => character && character.name);
+    if (characters.length) this.meta.characters = characters;
+
     if (entry.communityScore) {
       this.meta.statistics.push({
-        title: api.storage.lang('overview_sidebar_Score'),
+        title: lang('overview_sidebar_Score'),
         body: String(entry.communityScore),
       });
     }
-    if (entry.year) {
-      this.meta.info.push({ title: 'Year', body: [{ text: String(entry.year) }] });
-    }
-    if (this.type === 'anime' && entry.totalEp) {
+
+    const pushInfo = (key: string, text: string | number) => {
+      if (text) this.meta.info.push({ title: lang(key), body: [{ text: String(text) }] });
+    };
+    pushInfo('overview_sidebar_Format', entry.format);
+    pushInfo('overview_sidebar_Status', entry.airStatus);
+    pushInfo('overview_sidebar_Season', entry.season);
+    if (entry.duration) {
       this.meta.info.push({
-        title: api.storage.lang('overview_sidebar_Episodes'),
-        body: [{ text: String(entry.totalEp) }],
+        title: lang('overview_sidebar_Duration'),
+        body: [{ text: `${entry.duration} min` }],
       });
     }
-    if (this.type === 'manga' && entry.totalVol) {
-      this.meta.info.push({ title: 'Volumes', body: [{ text: String(entry.totalVol) }] });
+    if (this.type === 'anime' && entry.totalEp) {
+      pushInfo('overview_sidebar_Episodes', entry.totalEp);
     }
-    const genres = (entry.genres || []).filter(Boolean);
-    if (genres.length) {
-      this.meta.info.push({ title: 'Genres', body: genres.map(genre => ({ text: genre })) });
+    if (this.type === 'manga' && entry.totalVol) {
+      pushInfo('overview_sidebar_Volumes', entry.totalVol);
+    }
+    if (!entry.season && entry.year) {
+      pushInfo('overview_sidebar_Premiered', entry.year);
     }
 
-    return this;
+    const genres = (entry.genres || []).filter(Boolean);
+    if (genres.length) {
+      this.meta.info.push({
+        title: lang('overview_sidebar_Genres'),
+        body: genres.map(genre => ({ text: genre })),
+      });
+    }
+    const studios = (entry.studios || []).filter(Boolean);
+    if (studios.length) {
+      this.meta.info.push({
+        title: lang('overview_sidebar_Studios'),
+        body: studios.map(studio => ({ text: studio })),
+      });
+    }
+  }
+
+  private fillGaps(live) {
+    if (!this.meta.title && live.title) this.meta.title = live.title;
+    if (!this.meta.description && live.description) this.meta.description = live.description;
+    if (!this.meta.image && live.image) this.meta.image = live.image;
+    if (!this.meta.imageLarge && live.imageLarge) this.meta.imageLarge = live.imageLarge;
+    if (live.imageBanner) this.meta.imageBanner = live.imageBanner;
+
+    if (!this.meta.alternativeTitle.length && live.alternativeTitle?.length) {
+      this.meta.alternativeTitle = live.alternativeTitle;
+    }
+    if (!this.meta.characters.length && live.characters?.length) {
+      this.meta.characters = live.characters;
+    }
+
+    // Append live entries the stored data doesn't already cover (matched by title).
+    const statTitles = new Set(this.meta.statistics.map(stat => stat.title.toLowerCase()));
+    (live.statistics || []).forEach(stat => {
+      if (!statTitles.has(stat.title.toLowerCase())) this.meta.statistics.push(stat);
+    });
+    const infoTitles = new Set(this.meta.info.map(info => info.title.toLowerCase()));
+    (live.info || []).forEach(info => {
+      if (!infoTitles.has(info.title.toLowerCase())) this.meta.info.push(info);
+    });
+
+    // Sections the entry never stores always come from live.
+    if (live.related?.length) this.meta.related = live.related;
+    if (live.reviews?.length) this.meta.reviews = live.reviews;
+    if (live.recommendations?.length) this.meta.recommendations = live.recommendations;
   }
 
   private canonicalUrlFromAliases(aliases: string[]): string {

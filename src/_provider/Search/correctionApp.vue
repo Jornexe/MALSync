@@ -79,6 +79,7 @@ import inputButton from './components/inputButton.vue';
 import entry from './components/entry.vue';
 import rules from './components/rules.vue';
 import { hideFloatbutton, showFloatbutton } from '../../floatbutton/init';
+import { getRichMeta, RichMeta } from '../AniList/search';
 
 export default {
   components: {
@@ -216,6 +217,18 @@ export default {
           if (isLinkedTarget && typeof singleObj.unlinkSearchCandidate === 'function') {
             await singleObj.unlinkSearchCandidate({ targetEntryId });
           } else {
+            // For an external source, fetch the detail fields (format/status/
+            // season/duration/studios/characters) that the search result doesn't
+            // carry, so they can be stored on the entry too.
+            let rich: Partial<RichMeta> = {};
+            if (isExternalSource && Number(item?.id) > 0) {
+              try {
+                rich = await getRichMeta(Number(item.id), this.searchClass.getNormalizedType());
+              } catch (e) {
+                con.error('[Correction] rich meta fetch failed', e);
+              }
+            }
+
             await singleObj.linkSearchCandidate({
               targetEntryId: targetEntryId || undefined,
               aliases: lookupAlias ? [lookupAlias] : [],
@@ -230,6 +243,12 @@ export default {
                     description: item?.description || '',
                     year: Number(item?.year) || 0,
                     communityScore: Number(item?.communityScore ?? item?.score) || 0,
+                    format: rich.format || '',
+                    airStatus: rich.airStatus || '',
+                    season: rich.season || '',
+                    duration: Number(rich.duration) || 0,
+                    studios: Array.isArray(rich.studios) ? rich.studios : [],
+                    characters: Array.isArray(rich.characters) ? rich.characters : [],
                   }
                 : undefined,
             });

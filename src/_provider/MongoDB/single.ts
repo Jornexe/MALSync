@@ -201,6 +201,30 @@ export class Single extends SingleAbstract {
     return Number(this.animeInfo?.communityScore) || 0;
   }
 
+  getFormat(): string {
+    return this.animeInfo?.format || '';
+  }
+
+  getAirStatus(): string {
+    return this.animeInfo?.airStatus || '';
+  }
+
+  getSeason(): string {
+    return this.animeInfo?.season || '';
+  }
+
+  getDuration(): number {
+    return Number(this.animeInfo?.duration) || 0;
+  }
+
+  getStudios(): string[] {
+    return normalizeAltTitles(this.animeInfo?.studios);
+  }
+
+  getCharacters(): { name: string; img: string; url: string; subtext: string }[] {
+    return Array.isArray(this.animeInfo?.characters) ? this.animeInfo.characters : [];
+  }
+
   _getDisplayUrl() {
     if (this.animeInfo?.sourceUrl) return this.animeInfo.sourceUrl;
 
@@ -302,6 +326,12 @@ export class Single extends SingleAbstract {
       year: Number(this.animeInfo.year) || 0,
       genres: normalizeAltTitles(this.animeInfo.genres),
       communityScore: Number(this.animeInfo.communityScore) || 0,
+      format: this.animeInfo.format || '',
+      airStatus: this.animeInfo.airStatus || '',
+      season: this.animeInfo.season || '',
+      duration: Number(this.animeInfo.duration) || 0,
+      studios: normalizeAltTitles(this.animeInfo.studios),
+      characters: Array.isArray(this.animeInfo.characters) ? this.animeInfo.characters : [],
     });
   }
 
@@ -351,6 +381,12 @@ export class Single extends SingleAbstract {
       description?: string;
       year?: number;
       communityScore?: number;
+      format?: string;
+      airStatus?: string;
+      season?: string;
+      duration?: number;
+      studios?: string[];
+      characters?: { name: string; img: string; url: string; subtext: string }[];
     };
   }) {
     // Inherit metadata from the chosen source (e.g. an AniList/MAL result).
@@ -384,12 +420,34 @@ export class Single extends SingleAbstract {
       Number(meta.communityScore) || 0,
     );
     this.animeInfo.description = fillStr(this.animeInfo.description || '', meta.description || '');
+    this.animeInfo.duration = fillNum(
+      Number(this.animeInfo.duration) || 0,
+      Number(meta.duration) || 0,
+    );
+    this.animeInfo.format = fillStr(this.animeInfo.format || '', meta.format || '');
+    this.animeInfo.airStatus = fillStr(this.animeInfo.airStatus || '', meta.airStatus || '');
+    this.animeInfo.season = fillStr(this.animeInfo.season || '', meta.season || '');
 
     const incomingGenres = normalizeAltTitles(meta.genres);
     if (incomingGenres.length) {
       this.animeInfo.genres = replace
         ? incomingGenres
         : normalizeAltTitles([...(this.animeInfo.genres || []), ...incomingGenres]);
+    }
+
+    const incomingStudios = normalizeAltTitles(meta.studios);
+    if (incomingStudios.length) {
+      this.animeInfo.studios = replace
+        ? incomingStudios
+        : normalizeAltTitles([...(this.animeInfo.studios || []), ...incomingStudios]);
+    }
+
+    // Characters are a snapshot, not additive: replace, or fill when none stored.
+    const incomingCharacters = Array.isArray(meta.characters) ? meta.characters : [];
+    if (incomingCharacters.length) {
+      const hasStored =
+        Array.isArray(this.animeInfo.characters) && this.animeInfo.characters.length > 0;
+      if (replace || !hasStored) this.animeInfo.characters = incomingCharacters;
     }
 
     // Synonyms are additive: merge incoming alt titles (and the source title)

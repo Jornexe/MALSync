@@ -20,9 +20,17 @@ type MongoSyncRow = {
   year?: number;
   genres?: string[];
   communityScore?: number;
+  format?: string;
+  airStatus?: string;
+  season?: string;
+  duration?: number;
+  studios?: string[];
+  characters?: MongoCharacter[];
   updatedAt?: string | number | null;
   [extra: string]: unknown;
 };
+
+export type MongoCharacter = { name: string; img: string; url: string; subtext: string };
 
 type SyncEntryAggregate = {
   mediaType: string;
@@ -70,6 +78,12 @@ export type SyncEntryPayload = {
   year?: number;
   genres?: string[];
   communityScore?: number;
+  format?: string;
+  airStatus?: string;
+  season?: string;
+  duration?: number;
+  studios?: string[];
+  characters?: MongoCharacter[];
 };
 
 export type SyncEntryLinkPayload = {
@@ -120,6 +134,18 @@ function normalizeAltTitles(value: unknown): string[] {
     dedupe.add(trimmed);
   });
   return [...dedupe];
+}
+
+function normalizeCharacters(value: unknown): MongoCharacter[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(el => ({
+      name: typeof el?.name === 'string' ? el.name.trim() : '',
+      img: typeof el?.img === 'string' ? el.img : '',
+      url: typeof el?.url === 'string' ? el.url : '',
+      subtext: typeof el?.subtext === 'string' ? el.subtext : '',
+    }))
+    .filter(character => character.name);
 }
 
 function normalizeAliases(value: unknown): string[] {
@@ -552,6 +578,12 @@ export async function getEntry(
     year: Number(row.year) || 0,
     genres: normalizeAltTitles(row.genres),
     communityScore: Number(row.communityScore) || 0,
+    format: row.format || '',
+    airStatus: row.airStatus || '',
+    season: row.season || '',
+    duration: Number(row.duration) || 0,
+    studios: normalizeAltTitles(row.studios),
+    characters: normalizeCharacters(row.characters),
   };
 }
 
@@ -582,6 +614,12 @@ export async function upsertEntry(payload: SyncEntryPayload) {
       year: payload.year,
       genres: normalizeAltTitles(payload.genres),
       communityScore: payload.communityScore,
+      format: payload.format,
+      airStatus: payload.airStatus,
+      season: payload.season,
+      duration: payload.duration,
+      studios: normalizeAltTitles(payload.studios),
+      characters: normalizeCharacters(payload.characters),
     }),
   });
 

@@ -26,6 +26,12 @@ export type SyncEntryDoc = {
   year?: number;
   genres?: string[];
   communityScore?: number;
+  format?: string;
+  airStatus?: string;
+  season?: string;
+  duration?: number;
+  studios?: string[];
+  characters?: { name: string; img: string; url: string; subtext: string }[];
   updatedAt: Date;
   [extra: string]: unknown;
 };

@@ -320,7 +320,15 @@ export class Single extends SingleAbstract {
     aliases?: string[];
     altTitles?: string[];
     title?: string;
+    image?: string;
   }) {
+    // Inherit metadata from the chosen source (e.g. an AniList/MAL result):
+    // adopt its cover image, and its title when the entry has none of its own.
+    if (payload.image) this.animeInfo.image = payload.image;
+    if (payload.title && (!this.animeInfo.name || this.animeInfo.name === this.entryId)) {
+      this.animeInfo.name = payload.title;
+    }
+
     await this.sync();
 
     const altTitles = normalizeAltTitles([...(payload.altTitles || []), payload.title || '']);

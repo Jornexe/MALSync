@@ -163,7 +163,8 @@ export default {
       const source = String(item.source || '').toLowerCase();
       if (Number.isFinite(id) && id > 0) {
         if (source.includes('anilist')) return `anilist:${id}`;
-        if (source.includes('myanimelist') || /myanimelist\.net/i.test(url || '')) return `mal:${id}`;
+        if (source.includes('myanimelist') || /myanimelist\.net/i.test(url || ''))
+          return `mal:${id}`;
         if (source.includes('kitsu')) return `kitsu:${id}`;
         if (source.includes('simkl')) return `simkl:${id}`;
         if (source.includes('shiki')) return `shiki:${id}`;
@@ -181,12 +182,9 @@ export default {
           return;
         }
 
-        const targetEntryId =
-          item && item.source === 'SpaceTimeDB'
-            ? String(item.sdbEntryId || '')
-            : item && item.source === 'MongoDB'
-              ? String(item.mongoEntryId || '')
-              : '';
+        let targetEntryId = '';
+        if (item && item.source === 'SpaceTimeDB') targetEntryId = String(item.sdbEntryId || '');
+        else if (item && item.source === 'MongoDB') targetEntryId = String(item.mongoEntryId || '');
 
         // Clicking the current entry itself is not a valid link target.
         const ownEntryId =
@@ -203,8 +201,17 @@ export default {
           typeof singleObj.getLinkedAliases === 'function' ? singleObj.getLinkedAliases() : [];
         const isLinkedTarget = Boolean(targetEntryId && existingAliases.includes(targetEntryId));
 
+        // No target entry id means this is an external source (AniList/MAL
+        // lookup) the user picked to enrich the current entry, rather than
+        // another stored entry to dedup-link against.
+        const isExternalSource = !targetEntryId;
+
+        let busyMessage = 'Linking entries...';
+        if (isLinkedTarget) busyMessage = 'Removing link...';
+        else if (isExternalSource) busyMessage = 'Importing metadata...';
+
         this.busy = true;
-        this.busyMessage = isLinkedTarget ? 'Removing link...' : 'Linking entry...';
+        this.busyMessage = busyMessage;
         try {
           if (isLinkedTarget && typeof singleObj.unlinkSearchCandidate === 'function') {
             await singleObj.unlinkSearchCandidate({ targetEntryId });
@@ -214,6 +221,7 @@ export default {
               aliases: lookupAlias ? [lookupAlias] : [],
               altTitles: Array.isArray(item?.altNames) ? item.altNames : [],
               title: item?.name || '',
+              image: isExternalSource ? item?.imageLarge || item?.image || '' : undefined,
             });
           }
 
@@ -223,13 +231,10 @@ export default {
             this.syncPage.fillUI();
           }
 
-          utils.flashm(
-            isLinkedTarget
-              ? `Removed ${providerLabel} link`
-              : targetEntryId
-                ? `Linked ${providerLabel} entries`
-                : `Added alias data for ${providerLabel} entry`,
-          );
+          let resultMessage = `Imported metadata into ${providerLabel} entry`;
+          if (isLinkedTarget) resultMessage = `Removed ${providerLabel} link`;
+          else if (targetEntryId) resultMessage = `Linked ${providerLabel} entries`;
+          utils.flashm(resultMessage);
           this.close();
         } finally {
           this.busy = false;

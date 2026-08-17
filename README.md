@@ -1,4 +1,4 @@
-Forked to allow fully selfhosted sync via spacetimedb/mongo.
+Forked to allow fully selfhosted sync via mongo +restapi.
 
 [![Discord](https://img.shields.io/discord/358599430502481920.svg?style=flat-square&logo=discord&label=Chat%20%2F%20Support&colorB=7289DA)](https://discord.com/invite/cTH4yaw)
 [![Issues](https://img.shields.io/github/issues/MALSync/MALSync.svg?style=flat-square&logo=github&logoColor=white)](https://github.com/MALSync/MALSync/issues)

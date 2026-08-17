@@ -34,15 +34,13 @@ export const manga4life: pageInterface = {
       );
     },
     getEpisode(url) {
-      return parseInt(
-        utils
-          .getBaseText(
-            $(
-              'div.MainContainer > div.container > div.row > div.Column:nth-child(2) > button',
-            ).first(),
-          )
-          .match(/\d+/gim)![0],
+      const text = utils.getBaseText(
+        $(
+          'div.MainContainer > div.container > div.row > div.Column:nth-child(2) > button',
+        ).first(),
       );
+      const match = text.match(/\d+(?:\.\d+)?/gim);
+      return match ? parseFloat(match[0]) : 0;
     },
     readerConfig: [
       {
@@ -92,7 +90,8 @@ export const manga4life: pageInterface = {
         return utils.absoluteLink(selector.attr('href'), manga4life.domain);
       },
       elementEp(selector) {
-        return Number(selector.find('span').first().text().match(/\d+/gim));
+        const match = selector.find('span').first().text().match(/\d+(?:\.\d+)?/gim);
+        return match ? Number(match[0]) : 0;
       },
     },
   },

@@ -29,11 +29,11 @@ export const MangaKatana: pageInterface = {
 
       if (episodePart.length === 0) return NaN;
 
-      const temp = episodePart.match(/c\d*/gi);
+      const temp = episodePart.match(/c(\d+(?:\.\d+)?)/i);
 
       if (!temp || temp.length === 0) return NaN;
 
-      return Number(temp[0].replace(/\D+/g, ''));
+      return Number(temp[1]);
     },
     nextEpUrl() {
       const nextEpisodeAnchor = document.querySelector('a.nav_button.next') as HTMLAnchorElement;

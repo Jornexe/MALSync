@@ -27,7 +27,7 @@ export const MangaBuddy: pageInterface = {
     getEpisode(url) {
       const episodePart = utils.urlPart(url, 4);
 
-      const temp = episodePart.match(/chapter-(\d+)/im);
+      const temp = episodePart.match(/chapter-(\d+(?:\.\d+)?)/im);
 
       if (!temp) return NaN;
 

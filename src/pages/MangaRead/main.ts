@@ -35,9 +35,9 @@ export const MangaRead: pageInterface = {
     },
     getEpisode(url) {
       const episodePart = utils.urlPart(url, 5);
-      const temp = episodePart.match(/chapter-([\d]+)/gi);
+      const temp = episodePart.match(/chapter-(\d+(?:\.\d+)?)/i);
       if (!temp || !temp.length) return 0;
-      return Number(temp[0].replace('chapter-', ''));
+      return Number(temp[1]);
     },
     nextEpUrl(url) {
       return j.$('.nav-links a.next_page').attr('href') || '';

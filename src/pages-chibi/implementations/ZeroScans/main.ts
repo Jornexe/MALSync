@@ -32,7 +32,7 @@ export const ZeroScans: PageInterface = {
       return $c
         .querySelector('.d-flex a:nth-child(5)')
         .text()
-        .regex('Chapter[ _-]?(\\d+)', 1)
+        .regex('Chapter[ _-]?(\\d+(?:\\.\\d+)?)', 1)
         .number()
         .ifNotReturn()
         .run();

@@ -38,7 +38,7 @@ export const DynastyScans: PageInterface = {
         .run();
     },
     getEpisode($c) {
-      return $c.url().urlPart(4).regex('_ch(\\d+)', 1).number().run();
+      return $c.url().urlPart(4).regex('_ch(\\d+(?:\\.\\d+)?)', 1).number().run();
     },
     getVolume($c) {
       return $c

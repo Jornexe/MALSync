@@ -46,8 +46,8 @@ export const WeebDex: PageInterface = {
     },
     readerConfig: [
       {
-        current: $c => getChapterProgressText($c).regex('(\\d+)\\s*/', 1).number().run(),
-        total: $c => getChapterProgressText($c).regex('/\\s*(\\d+)', 1).number().run(),
+        current: $c => getChapterProgressText($c).regex('(\\d+(?:\\.\\d+)?)\\s*/', 1).number().run(),
+        total: $c => getChapterProgressText($c).regex('/\\s*(\\d+(?:\\.\\d+)?)', 1).number().run(),
       },
     ],
   },

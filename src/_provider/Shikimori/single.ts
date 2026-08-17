@@ -110,11 +110,13 @@ export class Single extends SingleAbstract {
   }
 
   _setEpisode(episode) {
+    // Shikimori expects integer progress; floor decimals at the boundary.
+    const value = Math.floor(Number(episode) || 0);
     if (this.type === 'manga') {
-      this.animeInfo!.chapters = parseInt(`${episode}`);
+      this.animeInfo!.chapters = value;
       return;
     }
-    this.animeInfo!.episodes = parseInt(`${episode}`);
+    this.animeInfo!.episodes = value;
   }
 
   _getVolume() {

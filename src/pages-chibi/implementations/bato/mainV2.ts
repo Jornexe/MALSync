@@ -214,7 +214,7 @@ function getChapterText($c: ChibiGenerator<any>) {
 
 export function getChapter($c: ChibiGenerator<string>) {
   return $c
-    .regex('(ch|chapter|episode|ep\\.?|chap|chp|no\\.?)\\D?(\\d+)', 2)
+    .regex('(ch|chapter|episode|ep\\.?|chap|chp|no\\.?)\\D?(\\d+(?:\\.\\d+)?)', 2)
     .ifNotReturn()
     .number();
 }

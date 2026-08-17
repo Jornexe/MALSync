@@ -1,4 +1,6 @@
 /* eslint-disable */
+import { ServerOfflineError } from '../Errors';
+
 type MongoSyncRow = {
   entryId: string;
   userKey: string;
@@ -309,24 +311,90 @@ function requireLibraryKey() {
   return libraryKey;
 }
 
-async function mongoFetch<T = any>(path: string, init: RequestInit = {}): Promise<T> {
+function originPatternFromServerUrl(raw: string): string | null {
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    return `${parsed.protocol}//${parsed.host}/*`;
+  } catch (_err) {
+    return null;
+  }
+}
+
+export async function requestMongoServerPermission(serverUrl?: string): Promise<boolean> {
+  if (api.type !== 'webextension' || typeof chrome?.permissions?.request !== 'function') {
+    return true;
+  }
+
+  const origin = originPatternFromServerUrl(serverUrl || getServerUrl());
+  if (!origin) return false;
+
+  const alreadyGranted = await chrome.permissions.contains({ origins: [origin] });
+  if (alreadyGranted) return true;
+
+  return chrome.permissions.request({ origins: [origin] });
+}
+
+async function mongoFetch<T = any>(
+  path: string,
+  init: RequestInit = {},
+  retry = 0,
+): Promise<T> {
   const url = `${getServerUrl()}${path}`;
   const apiKey = getApiKey();
-  const headers = new Headers(init.headers || {});
-  headers.set('Content-Type', 'application/json');
-  if (apiKey) headers.set('X-API-Key', apiKey);
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (apiKey) headers['X-API-Key'] = apiKey;
 
-  const res = await fetch(url, { ...init, headers });
+  // Content-script fetch() is blocked on HTTPS pages (mixed content / private
+  // network access) when talking to localhost or a Tailscale/LAN backend.
+  // Route through the background xhr helper like every other provider.
+  const method = String(init.method || 'GET').toUpperCase() as
+    | 'GET'
+    | 'POST'
+    | 'PUT'
+    | 'PATCH'
+    | 'DELETE';
+  const request: { url: string; headers: Record<string, string>; data?: any } = {
+    url,
+    headers,
+  };
+  if (init.body !== undefined && init.body !== null) {
+    request.data = init.body;
+  }
+
+  const retryGet = async () => {
+    await new Promise(resolve => setTimeout(resolve, 400 * (retry + 1)));
+    return mongoFetch<T>(path, init, retry + 1);
+  };
+
+  let xhr;
+  try {
+    xhr = await api.request.xhr(method, request);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    con.error(logScope, 'request failed', { url, message, retry });
+    if (method === 'GET' && retry < 2) return retryGet();
+    throw new ServerOfflineError(
+      `MongoDB sync: cannot reach ${getServerUrl()} (${message || 'Failed to fetch'})`,
+    );
+  }
+
   let body: any = null;
   try {
-    body = await res.json();
+    body = xhr.responseText ? JSON.parse(xhr.responseText) : null;
   } catch (_err) {
     body = null;
   }
 
-  if (!res.ok) {
-    const message = (body && body.error) || `HTTP ${res.status}`;
-    con.error(logScope, 'request failed', { url, status: res.status, message });
+  if (!xhr.status || xhr.status < 200 || xhr.status >= 300) {
+    const message = (body && body.error) || xhr.responseText || `HTTP ${xhr.status}`;
+    con.error(logScope, 'request failed', { url, status: xhr.status, message, retry });
+    if (!xhr.status) {
+      if (method === 'GET' && retry < 2) return retryGet();
+      throw new ServerOfflineError(`MongoDB sync: cannot reach ${getServerUrl()}`);
+    }
     throw new Error(`MongoDB sync: ${message}`);
   }
 

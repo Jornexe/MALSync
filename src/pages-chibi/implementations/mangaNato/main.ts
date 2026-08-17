@@ -48,7 +48,7 @@ export const mangaNato: PageInterface = {
       return $c.url().split('/').slice(0, 5).join('/').run();
     },
     getEpisode($c) {
-      return $c.url().urlPart(5).regex('chapter[_-](\\d+)', 1).number().run();
+      return $c.url().urlPart(5).regex('chapter[_-](\\d+(?:\\.\\d+)?)', 1).number().run();
     },
     nextEpUrl($c) {
       return $c

@@ -34,6 +34,11 @@ export abstract class SingleAbstract {
 
   protected askCompleted = false;
 
+  // Site-scoped local:// backup key, set by the sync page when localSync is on.
+  // Used only as a write-through copy of the current progress; never read back
+  // into MongoDB/SpaceTimeDB automatically.
+  protected localBackupUrl = '';
+
   public abstract shortName: string;
 
   protected abstract authenticationUrl: string;
@@ -211,7 +216,9 @@ export abstract class SingleAbstract {
   abstract _setEpisode(episode: number): void;
 
   public setEpisode(episode: number): SingleAbstract {
-    episode = parseInt(`${episode}`);
+    // Allow decimal chapter numbers (e.g. 2.1, 2.2) common in manga.
+    episode = parseFloat(`${episode}`);
+    if (!Number.isFinite(episode) || episode < 0) episode = 0;
     if (this.getTotalEpisodes() && episode > this.getTotalEpisodes())
       episode = this.getTotalEpisodes();
     this._setEpisode(episode);
@@ -415,6 +422,45 @@ export abstract class SingleAbstract {
 
   abstract _sync(): Promise<void>;
 
+  public setLocalBackupUrl(url: string) {
+    this.localBackupUrl = url || '';
+    return this;
+  }
+
+  public getLocalBackupUrl() {
+    return this.localBackupUrl;
+  }
+
+  // Mirror the current progress into the local:// list. This is a backup write
+  // only: it never reads local back into the active provider, and a failure
+  // here must not fail the primary sync.
+  protected async writeLocalBackup() {
+    if (!api.settings.get('localSync')) return;
+    if (this.shortName === 'Local') return;
+    if (this.shortName !== 'MongoDB' && this.shortName !== 'SpaceTimeDB') return;
+    if (this.getSyncMethod() === 'listSync') return;
+    if (!this.localBackupUrl || !/^local:\/\//i.test(this.localBackupUrl)) return;
+
+    try {
+      const existing = (await api.storage.get(this.localBackupUrl)) || {};
+      await api.storage.set(this.localBackupUrl, {
+        ...existing,
+        name: this.getTitle(true) || existing.name || '',
+        tags: this._getTags() || existing.tags || '',
+        sUrl: this.getStreamingUrl() || existing.sUrl || '',
+        image: this.getImage() || existing.image || '',
+        progress: Number(this.getEpisode()) || 0,
+        volumeprogress: Number(this.getVolume()) || 0,
+        score: Number(this.getScore()) || 0,
+        status: Number(this.getStatus()) || 6,
+        sourceUrl: this.getUrl() || existing.sourceUrl || '',
+      });
+      this.logger.log('[SINGLE]', 'Local backup written', this.localBackupUrl);
+    } catch (e) {
+      this.logger.error('[SINGLE]', 'Local backup write failed', e);
+    }
+  }
+
   public async sync(): Promise<void> {
     this.logger.log('[SINGLE]', 'Sync', this.ids);
     this.lastError = null;
@@ -422,17 +468,24 @@ export abstract class SingleAbstract {
       await utils.setEntrySettings(this.type, this.getCacheKey(), this.options, this._getTags()),
     );
     this.fixDates();
-    return this._sync()
-      .catch(e => {
-        this.lastError = e;
-        throw e;
-      })
-      .then(() => {
-        this.undoState = this.persistenceState;
-        if (this.updateProgress) this.initProgress();
-        this._onList = true;
-        this.emitUpdate();
-      });
+
+    // Write the local backup in parallel so a down database still keeps the
+    // on-device copy current. Do not let a backup failure fail the primary write.
+    const backupPromise = this.writeLocalBackup();
+
+    try {
+      await this._sync();
+    } catch (e) {
+      this.lastError = e;
+      await backupPromise;
+      throw e;
+    }
+
+    this.undoState = this.persistenceState;
+    if (this.updateProgress) this.initProgress();
+    this._onList = true;
+    this.emitUpdate();
+    await backupPromise;
   }
 
   public emitUpdate(action: 'update' | 'state' = 'update') {
@@ -729,6 +782,17 @@ export abstract class SingleAbstract {
         (curVolume || volume > 1 || !episode) &&
         volume > curVolume
       )
+    ) {
+      return false;
+    }
+
+    // Integer-only list providers (AniList/MAL/…) store floor(progress). Once
+    // progress is N, decimal chapters N.x are already considered read there.
+    if (
+      episode > 0 &&
+      Number.isInteger(curEpisode) &&
+      !Number.isInteger(episode) &&
+      curEpisode === Math.floor(episode)
     ) {
       return false;
     }

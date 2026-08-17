@@ -37,7 +37,7 @@ export const LuaScans: PageInterface = {
         .run();
     },
     getEpisode($c) {
-      return $c.url().urlPart(5).regex('chapter-?(\\d+)', 1).number().run();
+      return $c.url().urlPart(5).regex('chapter-?(\\d+(?:\\.\\d+)?)', 1).number().run();
     },
     nextEpUrl($c) {
       return $c
@@ -88,7 +88,7 @@ export const LuaScans: PageInterface = {
       return $c.closest('a').ifNotReturn().getAttribute('href').urlAbsolute().run();
     },
     elementEp($c) {
-      return $c.find('.text-xs').text().regex('chapter\\s*(\\d+)', 1).number().run();
+      return $c.find('.text-xs').text().regex('chapter\\s*(\\d+(?:\\.\\d+)?)', 1).number().run();
     },
   },
   lifecycle: {

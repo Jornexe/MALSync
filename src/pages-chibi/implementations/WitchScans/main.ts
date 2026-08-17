@@ -28,7 +28,7 @@ export const WitchScans: PageInterface = {
       return $c.querySelector('.allc a').getAttribute('href').ifNotReturn().urlAbsolute().run();
     },
     getEpisode($c) {
-      return $c.url().urlPart(3).regex('chapter[_-]?(\\d+)', 1).number().ifNotReturn().run();
+      return $c.url().urlPart(3).regex('chapter[_-]?(\\d+(?:\\.\\d+)?)', 1).number().ifNotReturn().run();
     },
     nextEpUrl($c) {
       return $c

@@ -34,7 +34,7 @@ export const Ritharscans: PageInterface = {
         .getGlobalVariable('data')
         .get('name')
         .string()
-        .regex('^Chapter (\\d+)', 1)
+        .regex('^Chapter (\\d+(?:\\.\\d+)?)', 1)
         .number()
         .run();
     },
@@ -89,7 +89,7 @@ export const Ritharscans: PageInterface = {
       return $c.getAttribute('href').urlAbsolute().run();
     },
     elementEp($c) {
-      return $c.getAttribute('title').regex('Chapter (\\d+)', 1).number().run();
+      return $c.getAttribute('title').regex('Chapter (\\d+(?:\\.\\d+)?)', 1).number().run();
     },
   },
   lifecycle: {

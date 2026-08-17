@@ -54,7 +54,7 @@ export const MangaPark: PageInterface = {
       const chapter = $c
         .url()
         .urlPart(5)
-        .regex('(chapter|ch)(-|.)(\\d+)', 3)
+        .regex('(chapter|ch)(-|.)(\\d+(?:\\.\\d+)?)', 3)
         .number()
         .ifNotReturn()
         .run();

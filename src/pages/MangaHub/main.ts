@@ -33,11 +33,11 @@ export const MangaHub: pageInterface = {
     getEpisode(url) {
       const episodePart = utils.urlPart(url, 5);
 
-      const temp = episodePart.match(/chapter-\d+/gim);
+      const temp = episodePart.match(/chapter-(\d+(?:\.\d+)?)/im);
 
       if (!temp || !temp.length) return 0;
 
-      return Number(temp[0].replace(/\D+/g, ''));
+      return Number(temp[1]);
     },
     nextEpUrl(url) {
       return j.$('#mangareader ul.dropdown-menu li.active').next().find('a').attr('href');

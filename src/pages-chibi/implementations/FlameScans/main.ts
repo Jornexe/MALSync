@@ -31,7 +31,7 @@ export const FlameScans: PageInterface = {
       return $c
         .querySelector('[class*="TopChapterNavbar_chapter_title"]')
         .text()
-        .regex('Chapter[ _-]?(\\d+)', 1)
+        .regex('Chapter[ _-]?(\\d+(?:\\.\\d+)?)', 1)
         .number()
         .ifNotReturn()
         .run();
@@ -84,7 +84,7 @@ export const FlameScans: PageInterface = {
         .find('.mantine-Text-root')
         .text()
         .trim()
-        .regex('Chapter[ _-]?(\\d+)', 1)
+        .regex('Chapter[ _-]?(\\d+(?:\\.\\d+)?)', 1)
         .number()
         .run();
     },

@@ -14,7 +14,7 @@ export const RezoScans: PageInterface = {
       return $c
         .and(
           $c.url().urlPart(3).equals('series').run(),
-          $c.url().urlPart(5).matches('chapter[_-]?(\\d+)').run(),
+          $c.url().urlPart(5).matches('chapter[_-]?(\\d+(?:\\.\\d+)?)').run(),
         )
         .run();
     },

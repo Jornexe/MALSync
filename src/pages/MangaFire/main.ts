@@ -42,7 +42,7 @@ export const MangaFire: pageInterface = {
     getEpisode(url) {
       const episodePart = utils.urlPart(url, 6);
 
-      const temp = episodePart.match(/chapter-(\d+)/im);
+      const temp = episodePart.match(/chapter-(\d+(?:\.\d+)?)/im);
 
       if (!temp) return NaN;
 
@@ -51,7 +51,7 @@ export const MangaFire: pageInterface = {
     getVolume(url) {
       const episodePart = utils.urlPart(url, 6);
 
-      const temp = episodePart.match(/volume-(\d+)/im);
+      const temp = episodePart.match(/volume-(\d+(?:\.\d+)?)/im);
 
       if (!temp) return NaN;
 

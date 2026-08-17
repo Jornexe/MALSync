@@ -441,7 +441,8 @@ export const background = {
           setBadgeText('');
         });
     }
-    con.error('Background list Sync not allowed');
+    // Expected when the feature is off (default for most setups, e.g. Mongo-only).
+    con.info('Background list Sync not allowed');
     return [];
 
     async function syncLists(type) {

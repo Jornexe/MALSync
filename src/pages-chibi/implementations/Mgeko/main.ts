@@ -34,7 +34,7 @@ export const Mgeko: PageInterface = {
       return $c.this('overview.getImage').run();
     },
     getEpisode($c) {
-      return $c.url().urlPart(5).regex('chapter-?(\\d+)', 1).number().run();
+      return $c.url().urlPart(5).regex('chapter-?(\\d+(?:\\.\\d+)?)', 1).number().run();
     },
     nextEpUrl($c) {
       return $c.querySelector('.nextchap').getAttribute('href').ifNotReturn().urlAbsolute().run();

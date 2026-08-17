@@ -24,11 +24,11 @@ export const ReadManhua: pageInterface = {
     getEpisode(url) {
       const episodePart = utils.urlPart(url, 5);
 
-      const temp = episodePart.match(/chapter-\d+/gim);
+      const temp = episodePart.match(/chapter-(\d+(?:\.\d+)?)/im);
 
       if (!temp || temp.length === 0) return 1;
 
-      return Number(temp[0].replace(/\D+/g, ''));
+      return Number(temp[1]);
     },
     nextEpUrl(url) {
       return j

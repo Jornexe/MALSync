@@ -74,7 +74,7 @@ export const Thunderscans: PageInterface = {
       return $c.closest('a').getAttribute('href').ifNotReturn().urlAbsolute().run();
     },
     elementEp($c) {
-      return $c.find('.chapternum').text().regex('chapter\\s*(\\d+)', 1).number().run();
+      return $c.find('.chapternum').text().regex('chapter\\s*(\\d+(?:\\.\\d+)?)', 1).number().run();
     },
   },
   lifecycle: {

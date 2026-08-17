@@ -138,7 +138,7 @@ function getEpisode($c) {
       .regex('^(\\d+)', 1)
       .ifThen($c => $c.number().run())
       .run(),
-    $c.getVariable('chapterUrlPart').regex('chapter[_-](\\d+)', 1).number().run(),
+    $c.getVariable('chapterUrlPart').regex('chapter[_-](\\d+(?:\\.\\d+)?)', 1).number().run(),
   );
 }
 

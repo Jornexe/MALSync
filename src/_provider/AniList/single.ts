@@ -101,7 +101,8 @@ export class Single extends SingleAbstract {
   }
 
   _setEpisode(episode) {
-    this.animeInfo.mediaListEntry.progress = parseInt(`${episode}`);
+    // AniList API only accepts integer progress; floor decimals at the boundary.
+    this.animeInfo.mediaListEntry.progress = Math.floor(Number(episode) || 0);
   }
 
   _getVolume() {

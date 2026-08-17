@@ -36,8 +36,9 @@ export const SyncEntry = table(
 		image: t.string().optional(),
 		tags: t.string(),
 		streamingUrl: t.string().optional(),
-		progress: t.u32(),
-		volumeProgress: t.u32(),
+		// f64 so manga chapter progress can be fractional (2.1, 2.2, …).
+		progress: t.f64(),
+		volumeProgress: t.f64(),
 		score: t.u8(),
 		status: t.u8(),
 		updatedAt: t.timestamp(),

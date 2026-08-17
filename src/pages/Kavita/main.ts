@@ -68,10 +68,11 @@ export const Kavita: pageInterface = {
       return window.location.href.split('/').slice(0, 7).join('/');
     },
     getEpisode(url) {
-      return parseInt(chapterDetails.chapterNum) || 1;
+      const n = parseFloat(chapterDetails.chapterNum);
+      return Number.isFinite(n) && n > 0 ? n : 1;
     },
     getVolume(url) {
-      return parseInt(chapterDetails.volumeNum);
+      return parseFloat(chapterDetails.volumeNum) || 0;
     },
     getMalUrl(provider) {
       if (seriesDetails.malLink) return seriesDetails.malLink;

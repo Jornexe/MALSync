@@ -40,7 +40,7 @@ export const Comikey: PageInterface = {
       return $c
         .url()
         .urlPart(6)
-        .regex('(?:chapter|episode|espanol|bahasa|portugues)[_-]?(\\d+)', 1)
+        .regex('(?:chapter|episode|espanol|bahasa|portugues)[_-]?(\\d+(?:\\.\\d+)?)', 1)
         .number()
         .run();
     },

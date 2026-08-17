@@ -19,5 +19,9 @@
   "https://api.mangabaka.dev/",
   "https://*.mangabaka.org/",
   "https://shikimori.one/",
-  "https://*.plex.direct/"
+  "https://*.plex.direct/",
+  "http://localhost/*",
+  "http://127.0.0.1/*",
+  "https://localhost/*",
+  "https://127.0.0.1/*"
 ]

@@ -40,10 +40,10 @@ export const QiScans: PageInterface = {
         .coalesce(
           $c
             .title()
-            .regex('chapter (\\d+)', 1)
+            .regex('chapter (\\d+(?:\\.\\d+)?)', 1)
             .ifThen($c => $c.number().run())
             .run(),
-          $c.url().urlPart(5).regex('chapter[_-](\\d+)', 1).run(),
+          $c.url().urlPart(5).regex('chapter[_-](\\d+(?:\\.\\d+)?)', 1).run(),
         )
         .ifNotReturn()
         .number()
@@ -96,7 +96,7 @@ export const QiScans: PageInterface = {
       return $c.closest('a').ifNotReturn().getAttribute('href').urlAbsolute().run();
     },
     elementEp($c) {
-      return $c.find('h3').ifNotReturn().text().regex('Chapter (\\d+)', 1).number().run();
+      return $c.find('h3').ifNotReturn().text().regex('Chapter (\\d+(?:\\.\\d+)?)', 1).number().run();
     },
   },
   lifecycle: {

@@ -122,7 +122,7 @@ export class Single extends SingleAbstract {
   }
 
   _setEpisode(episode) {
-    this.animeInfo.progress = parseInt(`${episode}`);
+    this.animeInfo.progress = Number(episode) || 0;
   }
 
   _getVolume() {

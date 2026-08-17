@@ -28,7 +28,13 @@ export const MangaTaro: PageInterface = {
       return $c.querySelector('a.space-x-2').getAttribute('href').ifNotReturn().urlAbsolute().run();
     },
     getEpisode($c) {
-      return $c.url().urlPart(5).regex('ch[_-]?(\\d+)', 1).number().ifNotReturn().run();
+      return $c
+        .url()
+        .urlPart(5)
+        .regex('ch[_-]?(\\d+(?:\\.\\d+)?)', 1)
+        .number()
+        .ifNotReturn()
+        .run();
     },
     nextEpUrl($c) {
       return $c

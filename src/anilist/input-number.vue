@@ -53,7 +53,8 @@ export default {
       type: String,
     },
     pattern: {
-      default: '^[0-9]*$',
+      // Allow integer or decimal chapter/episode numbers (e.g. 12, 2.1).
+      default: '^[0-9]*(\\.[0-9]+)?$',
       type: String,
     },
     additionalSlot: {

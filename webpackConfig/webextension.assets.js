@@ -212,9 +212,13 @@ const generateManifest = () => {
     ],
   };
 
-  if (mode === 'travis' && appTarget !== 'firefox') {
+  // Firefox-only keys cause Chrome to flag errors on load for unpacked builds.
+  if (appTarget !== 'firefox') {
     delete mani.browser_specific_settings;
-  } else if (mode === 'dev') {
+    delete mani.sidebar_action;
+  }
+
+  if (mode === 'dev') {
     delete mani.browser_specific_settings;
     mani.name = `${mani.name} (DEV)`;
     mani.version = new Date()

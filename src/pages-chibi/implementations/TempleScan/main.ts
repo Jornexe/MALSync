@@ -35,8 +35,8 @@ export const templeScan: PageInterface = {
     getEpisode($c) {
       return $c
         .coalesce(
-          $c.title().regex('chapter (\\d+)', 1).number().run(),
-          $c.url().urlPart(5).regex('chapter-(\\d+)', 1).number().run(),
+          $c.title().regex('chapter (\\d+(?:\\.\\d+)?)', 1).number().run(),
+          $c.url().urlPart(5).regex('chapter-(\\d+(?:\\.\\d+)?)', 1).number().run(),
         )
         .run();
     },

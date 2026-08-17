@@ -48,7 +48,7 @@ export const allManga: PageInterface = {
       return $c
         .querySelector('.breadcrumb-item:last-child span')
         .text()
-        .regex('(?:chapter|episode)\\s*(\\d+)', 1)
+        .regex('(?:chapter|episode)\\s*(\\d+(?:\\.\\d+)?)', 1)
         .number()
         .run();
     },

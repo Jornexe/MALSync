@@ -116,12 +116,10 @@ export function getInter(): pageInterface {
 }
 
 function getChapterNumber(text: string) {
-  let temp = text.match(/(ch\.|chapter)\D?\d+/i);
+  const temp = text.match(/(ch\.|chapter)\D?(\d+(?:\.\d+)?)/i);
   if (temp !== null) {
-    temp = temp[0].match(/\d+/);
-    if (temp !== null) {
-      return parseInt(temp[0]);
-    }
+    const n = parseFloat(temp[2]);
+    if (Number.isFinite(n)) return n;
   }
   return 1;
 }

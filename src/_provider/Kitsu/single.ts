@@ -125,7 +125,8 @@ export class Single extends SingleAbstract {
   }
 
   _setEpisode(episode) {
-    this.listI().attributes.progress = parseInt(`${episode}`);
+    // Kitsu expects integer progress; floor decimals at the boundary.
+    this.listI().attributes.progress = Math.floor(Number(episode) || 0);
   }
 
   _getVolume() {

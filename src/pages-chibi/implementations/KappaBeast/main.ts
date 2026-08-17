@@ -33,7 +33,7 @@ export const KappaBeast: PageInterface = {
         .querySelector('#chapter option[selected]')
         .ifNotReturn()
         .text()
-        .regex('Chapter\\s+(\\d+)', 1)
+        .regex('Chapter\\s+(\\d+(?:\\.\\d+)?)', 1)
         .number()
         .run();
     },
@@ -89,7 +89,7 @@ export const KappaBeast: PageInterface = {
       return $c.find('a').getAttribute('href').urlAbsolute().run();
     },
     elementEp($c) {
-      return $c.find('.chapternum').text().regex('(\\d+)').number().run();
+      return $c.find('.chapternum').text().regex('(\\d+(?:\\.\\d+)?)').number().run();
     },
   },
   lifecycle: {

@@ -33,7 +33,7 @@ export const Rawkuma: PageInterface = {
         .url()
         .urlPart(5)
         .ifNotReturn()
-        .regex('chapter[^\\d]?(\\d+)', 1, 'i')
+        .regex('chapter[^\\d]?(\\d+(?:\\.\\d+)?)', 1, 'i')
         .ifNotReturn()
         .number()
         .run();

@@ -88,11 +88,12 @@ export class Single extends SingleAbstract {
   }
 
   _setEpisode(episode) {
-    if (!episode) episode = 0;
+    // MAL only accepts integer progress; floor decimals at the boundary.
+    const value = Math.floor(Number(episode) || 0);
     if (this.type === 'manga') {
-      this.animeInfo['.add_manga[num_read_chapters]'] = parseInt(`${episode}`);
+      this.animeInfo['.add_manga[num_read_chapters]'] = value;
     }
-    this.animeInfo['.add_anime[num_watched_episodes]'] = parseInt(`${episode}`);
+    this.animeInfo['.add_anime[num_watched_episodes]'] = value;
   }
 
   _getVolume() {

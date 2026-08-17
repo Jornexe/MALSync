@@ -120,7 +120,7 @@ function grpRegex($c) {
   return $c.coalesce(
     $c
       .getVariable('Ep')
-      .regex('(?:第|#|_|e.|Chapter\\s?)(\\d+)', 1)
+      .regex('(?:第|#|_|e.|Chapter\\s?)(\\d+(?:\\.\\d+)?)', 1)
       .ifThen($c => $c.number().run())
       .run(),
     $c

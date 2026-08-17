@@ -37,7 +37,7 @@ export const MangaSushi: PageInterface = {
         .run();
     },
     getEpisode($c) {
-      return $c.url().urlPart(5).regex('(?:chapter|ch)[_-]?(\\d+)', 1).number().ifNotReturn().run();
+      return $c.url().urlPart(5).regex('(?:chapter|ch)[_-]?(\\d+(?:\\.\\d+)?)', 1).number().ifNotReturn().run();
     },
     nextEpUrl($c) {
       return $c.querySelector('.next_page').getAttribute('href').ifNotReturn().urlAbsolute().run();

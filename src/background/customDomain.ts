@@ -53,7 +53,19 @@ async function registerScripts() {
 
   await chrome.scripting.unregisterContentScripts();
   if (domains) {
-    await Promise.all(domains.map(registerScript));
+    // Chibi page configs (or user custom domains) can list the same match
+    // pattern more than once; chrome.scripting IDs must be unique.
+    const seen = new Set<string>();
+    const uniqueDomains = domains.filter(domainConfig => {
+      const key =
+        domainConfig.proxy || domainConfig.page === 'iframe' || domainConfig.player
+          ? `${domainConfig.domain}-${domainConfig.page}`
+          : domainConfig.domain;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    await Promise.all(uniqueDomains.map(registerScript));
   }
 
   const scripts = await chrome.scripting.getRegisteredContentScripts();

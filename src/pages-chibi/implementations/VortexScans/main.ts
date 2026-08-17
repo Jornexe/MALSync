@@ -16,7 +16,7 @@ export const VortexScans: PageInterface = {
         .and(
           $c.url().urlPart(3).equals('series').run(),
           $c.url().urlPart(5).boolean().run(),
-          $c.url().urlPart(5).matches('chapter[_-]?(\\d+)').run(),
+          $c.url().urlPart(5).matches('chapter[_-]?(\\d+(?:\\.\\d+)?)').run(),
         )
         .run();
     },

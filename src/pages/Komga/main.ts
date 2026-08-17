@@ -53,14 +53,16 @@ export const Komga: pageInterface = {
     getEpisode(url) {
       if (chapter.mode === 'oneshot') return 1;
       if (chapter.mode !== 'chapter') return 0;
-      if (!chapter.chapter || !parseInt(chapter.chapter)) throw 'No chapter number';
-      return parseInt(chapter.chapter);
+      const n = parseFloat(chapter.chapter);
+      if (!chapter.chapter || !Number.isFinite(n) || n <= 0) throw 'No chapter number';
+      return n;
     },
     getVolume(url) {
       if (chapter.mode === 'oneshot') return 1;
       if (chapter.mode !== 'volume') return 0;
-      if (!chapter.chapter || !parseInt(chapter.chapter)) throw 'No volume number';
-      return parseInt(chapter.chapter);
+      const n = parseFloat(chapter.chapter);
+      if (!chapter.chapter || !Number.isFinite(n) || n <= 0) throw 'No volume number';
+      return n;
     },
     getMalUrl(provider) {
       if (series.links.mal) return series.links.mal;

@@ -38,7 +38,7 @@ export const GDScans: PageInterface = {
         .run();
     },
     getEpisode($c) {
-      return $c.url().urlPart(6).regex('(?:chapter|ch)[_-]?(\\d+)', 1).number().ifNotReturn().run();
+      return $c.url().urlPart(6).regex('(?:chapter|ch)[_-]?(\\d+(?:\\.\\d+)?)', 1).number().ifNotReturn().run();
     },
     getVolume($c) {
       return $c.url().urlPart(5).regex('volume[_-]?(\\d+)', 1).number().ifNotReturn().run();

@@ -16,7 +16,7 @@ export const ArvenComics: PageInterface = {
         .and(
           $c.url().urlPart(5).boolean().run(),
           $c.url().urlPart(3).equals('comic').run(),
-          $c.url().urlPart(5).matches('(?:chapter[_-]?)(\\d+)|(\\d+)').run(),
+          $c.url().urlPart(5).matches('(?:chapter[_-]?)(\\d+(?:\\.\\d+)?)|(\\d+(?:\\.\\d+)?)').run(),
         )
         .run();
     },
@@ -34,7 +34,7 @@ export const ArvenComics: PageInterface = {
         .run();
     },
     getEpisode($c) {
-      return $c.url().urlPart(5).regex('(?:chapter|)[-_]?(\\d+)', 1).number().ifNotReturn().run();
+      return $c.url().urlPart(5).regex('(?:chapter|)[-_]?(\\d+(?:\\.\\d+)?)', 1).number().ifNotReturn().run();
     },
     nextEpUrl($c) {
       return $c.querySelector('.next_page').getAttribute('href').ifNotReturn().urlAbsolute().run();

@@ -35,7 +35,7 @@ export const GenzToon: PageInterface = {
         .closest('span')
         .ifNotReturn()
         .text()
-        .regex('chapter[ _-]?(\\d+)', 1)
+        .regex('chapter[ _-]?(\\d+(?:\\.\\d+)?)', 1)
         .number()
         .run();
     },
@@ -92,7 +92,7 @@ export const GenzToon: PageInterface = {
       return $c.getAttribute('href').urlAbsolute().run();
     },
     elementEp($c) {
-      return $c.getAttribute('title').regex('chapter[ _-]?(\\d+)', 1).number().run();
+      return $c.getAttribute('title').regex('chapter[ _-]?(\\d+(?:\\.\\d+)?)', 1).number().run();
     },
   },
   lifecycle: {

@@ -28,7 +28,7 @@ export const VioletScans: PageInterface = {
       return $c.querySelector('.allc a').getAttribute('href').ifNotReturn().urlAbsolute().run();
     },
     getEpisode($c) {
-      return $c.url().urlPart(3).regex('chapter-(\\d+)', 1).number().ifNotReturn().run();
+      return $c.url().urlPart(3).regex('chapter-(\\d+(?:\\.\\d+)?)', 1).number().ifNotReturn().run();
     },
     nextEpUrl($c) {
       return $c
@@ -82,7 +82,7 @@ export const VioletScans: PageInterface = {
       return $c.closest('a').getAttribute('href').urlAbsolute().run();
     },
     elementEp($c) {
-      return $c.find('.chapternum').text().regex('(\\d+)').number().run();
+      return $c.find('.chapternum').text().regex('(\\d+(?:\\.\\d+)?)').number().run();
     },
   },
   lifecycle: {

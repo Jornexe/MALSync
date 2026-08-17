@@ -27,14 +27,14 @@ export const ReaperScans: pageInterface = {
     getEpisode(url) {
       let temp = 0;
 
-      const titlePart = document.title.match(/chapter (\d+)/i);
+      const titlePart = document.title.match(/chapter (\d+(?:\.\d+)?)/i);
 
       if (titlePart && titlePart[1]) {
         temp = Number(titlePart[1]);
       }
 
       if (!temp) {
-        const episodePart = utils.urlPart(url, 5).match(/chapter-(\d+)/i);
+        const episodePart = utils.urlPart(url, 5).match(/chapter-(\d+(?:\.\d+)?)/i);
         if (episodePart) temp = Number(episodePart[1]);
       }
 

@@ -36,11 +36,11 @@ export const WuxiaWorld: pageInterface = {
     getEpisode(url) {
       const episodePart = url.split('/')[5];
 
-      const temp = episodePart.match(/(chapter|ch)-\d+/gim);
+      const temp = episodePart.match(/(?:chapter|ch)-(\d+(?:\.\d+)?)/im);
 
       if (!temp || temp.length === 0) return NaN;
 
-      return Number(temp[0].replace(/\D+/g, ''));
+      return Number(temp[1]);
     },
     nextEpUrl(url) {
       return j

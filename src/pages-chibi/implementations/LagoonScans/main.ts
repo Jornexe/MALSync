@@ -28,7 +28,7 @@ export const LagoonScans: PageInterface = {
       return $c.querySelector('.allc a').getAttribute('href').urlAbsolute().ifNotReturn().run();
     },
     getEpisode($c) {
-      return $c.url().urlPart(3).regex('chapter-?(\\d+)', 1).number().run();
+      return $c.url().urlPart(3).regex('chapter-?(\\d+(?:\\.\\d+)?)', 1).number().run();
     },
     nextEpUrl($c) {
       return $c

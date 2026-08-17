@@ -37,7 +37,7 @@ export const toonily: PageInterface = {
         .run();
     },
     getEpisode($c) {
-      return $c.url().urlPart(5).regex('chapter[_-](\\d+)', 1).number().run();
+      return $c.url().urlPart(5).regex('chapter[_-](\\d+(?:\\.\\d+)?)', 1).number().run();
     },
     nextEpUrl($c) {
       return $c

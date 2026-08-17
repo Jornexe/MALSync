@@ -50,10 +50,10 @@ export const voidScans: PageInterface = {
           $c
             .url()
             .urlPart(5)
-            .regex('chapter[_-](\\d+)', 1)
+            .regex('chapter[_-](\\d+(?:\\.\\d+)?)', 1)
             .ifThen($c => $c.number().run())
             .run(),
-          $c.title().regex('chapter (\\d+)', 1).run(),
+          $c.title().regex('chapter (\\d+(?:\\.\\d+)?)', 1).run(),
         )
         .ifNotReturn()
         .number()

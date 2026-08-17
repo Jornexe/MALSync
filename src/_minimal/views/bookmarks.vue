@@ -39,34 +39,37 @@
         <div class="material-icons m-pill" title="random">shuffle</div>
       </FormButton>
       <FormButton
+        v-if="storageMode"
         padding="pill"
-        :disabled="syncToSpaceTimeDbLoading"
-        @click="syncLocalToSpaceTimeDb()"
+        :disabled="syncButtonsDisabled"
+        @click="syncLocalToProvider()"
       >
-        <div class="material-icons m-pill" :class="{ spinning: syncToSpaceTimeDbLoading }">
-          {{ syncToSpaceTimeDbLoading ? 'sync' : 'cloud_upload' }}
+        <div class="material-icons m-pill" :class="{ spinning: manualSyncLoading }">
+          {{ manualSyncLoading ? 'sync' : 'cloud_upload' }}
         </div>
-        {{ syncToSpaceTimeDbLoading ? 'Syncing...' : 'Sync Local -> SDB' }}
+        {{ manualSyncLoading ? 'Syncing...' : 'Sync Local -> DB' }}
       </FormButton>
       <FormButton
+        v-if="storageMode"
         padding="pill"
-        :disabled="syncToSpaceTimeDbLoading"
-        @click="syncLocalToSpaceTimeDb(true)"
+        :disabled="syncButtonsDisabled"
+        @click="syncLocalToProvider(true)"
       >
-        <div class="material-icons m-pill" :class="{ spinning: syncToSpaceTimeDbLoading }">
-          {{ syncToSpaceTimeDbLoading ? 'sync' : 'cleaning_services' }}
+        <div class="material-icons m-pill" :class="{ spinning: manualSyncLoading }">
+          {{ manualSyncLoading ? 'sync' : 'cleaning_services' }}
         </div>
-        {{ syncToSpaceTimeDbLoading ? 'Syncing...' : 'Sync + Clear Local' }}
+        {{ manualSyncLoading ? 'Syncing...' : 'Sync + Clear Local' }}
       </FormButton>
       <FormButton
+        v-if="storageMode"
         padding="pill"
-        :disabled="syncToSpaceTimeDbLoading"
-        @click="syncSpaceTimeDbToLocal()"
+        :disabled="syncButtonsDisabled"
+        @click="syncProviderToLocal()"
       >
-        <div class="material-icons m-pill" :class="{ spinning: syncToSpaceTimeDbLoading }">
-          {{ syncToSpaceTimeDbLoading ? 'sync' : 'download' }}
+        <div class="material-icons m-pill" :class="{ spinning: manualSyncLoading }">
+          {{ manualSyncLoading ? 'sync' : 'download' }}
         </div>
-        {{ syncToSpaceTimeDbLoading ? 'Syncing...' : 'SDB -> Local' }}
+        {{ manualSyncLoading ? 'Syncing...' : 'DB -> Local' }}
       </FormButton>
       <div style="flex-grow: 1"></div>
       <FormDropdown
@@ -189,7 +192,14 @@ import { localStore } from '../../utils/localStore';
 import { status } from '../../_provider/definitions';
 import { getSyncMode } from '../../_provider/helper';
 import { exportData as exportLocalData } from '../../_provider/Local/import';
-import { getSyncList as getSpaceTimeDbSyncList, upsertEntry } from '../../_provider/SpaceTimeDB/helper';
+import {
+  getSyncList as getSpaceTimeDbSyncList,
+  upsertEntry as upsertSpaceTimeDbEntry,
+} from '../../_provider/SpaceTimeDB/helper';
+import {
+  getSyncList as getMongoDbSyncList,
+  upsertEntry as upsertMongoDbEntry,
+} from '../../_provider/MongoDB/helper';
 
 const rootWindow = inject('rootWindow') as Window;
 const rootDocument = inject('rootDocument') as Document;
@@ -260,8 +270,11 @@ const getSort = sortingOptions => {
   return 'default';
 };
 
+const dbReachable = ref(false);
+
 const listRequest = createRequest(parameters, async param => {
   cacheList.value = [];
+  dbReachable.value = false;
   let listProvider = await getList(param.value.state, param.value.type);
 
   listProvider.setSort(getSort(listProvider.getSortingOptions()));
@@ -274,6 +287,7 @@ const listRequest = createRequest(parameters, async param => {
   listProvider.modes.initProgress = true;
   listProvider.initFrontendMode();
 
+  let reachedDb = true;
   await listProvider.getNextPage().catch(async e => {
     const currentMode = getSyncMode(param.value.type);
     if (currentMode === 'SPACETIMEDB' || currentMode === 'MONGODB') {
@@ -283,6 +297,7 @@ const listRequest = createRequest(parameters, async param => {
         error: e,
       });
 
+      reachedDb = false;
       const localListProvider = new LocalList(param.value.state, param.value.type);
       localListProvider.setSort(getSort(localListProvider.getSortingOptions()));
       localListProvider.modes.cached = true;
@@ -296,12 +311,13 @@ const listRequest = createRequest(parameters, async param => {
         throw { e: localErr, html: localListProvider.errorMessage(localErr) };
       });
       listProvider = localListProvider;
-      utils.flashm(`${currentMode === 'SPACETIMEDB' ? 'SpaceTimeDB' : 'MongoDB'} is offline. Showing Local list.`);
+      utils.flashm('Database is offline. Showing Local list.');
       return;
     }
     throw { e, html: listProvider.errorMessage(e) };
   });
 
+  dbReachable.value = reachedDb && ['MONGODB', 'SPACETIMEDB'].includes(getSyncMode(param.value.type));
   return listProvider;
 });
 
@@ -483,7 +499,17 @@ const sort = computed({
 });
 
 const randomListCache = {};
-const syncToSpaceTimeDbLoading = ref(false);
+const manualSyncLoading = ref(false);
+
+const storageMode = computed(() => {
+  const mode = getSyncMode(parameters.value.type);
+  if (mode === 'MONGODB' || mode === 'SPACETIMEDB') return mode;
+  return '';
+});
+
+const syncButtonsDisabled = computed(
+  () => manualSyncLoading.value || listRequest.loading || !dbReachable.value,
+);
 
 async function openRandom(st, type) {
   const cacheKey = `${st}-${type}`;
@@ -562,20 +588,67 @@ async function collectLocalEntries() {
   return localEntryMap;
 }
 
-async function syncLocalToSpaceTimeDb(clearLocalAfterSync = false) {
-  if (syncToSpaceTimeDbLoading.value) {
+function localUrlForProviderEntry(
+  entryId: string,
+  mediaType: 'anime' | 'manga',
+  preferredSourceUrl: string,
+  localEntryMap: Map<string, any>,
+) {
+  if (/^local:\/\//i.test(preferredSourceUrl)) return preferredSourceUrl;
+
+  for (const localUrl of localEntryMap.keys()) {
+    const localType = (utils.urlPart(localUrl, 3) || '').toLowerCase();
+    const localId = decodeURIComponent(utils.urlPart(localUrl, 4) || '');
+    if (localType === mediaType && localId === entryId) return localUrl;
+  }
+
+  const fallbackPage = storageMode.value === 'MONGODB' ? 'mongodb' : 'spacetimedb';
+  return `local://${fallbackPage}/${mediaType}/${encodeURIComponent(entryId)}`;
+}
+
+async function upsertProviderEntry(payload: {
+  entryId: string;
+  mediaType: 'anime' | 'manga';
+  sourceUrl: string;
+  title: string;
+  image: string;
+  tags: string;
+  streamingUrl: string;
+  progress: number;
+  volumeProgress: number;
+  score: number;
+  status: number;
+}) {
+  if (storageMode.value === 'MONGODB') {
+    await upsertMongoDbEntry(payload);
+    return;
+  }
+  await upsertSpaceTimeDbEntry(payload);
+}
+
+async function loadProviderList() {
+  if (storageMode.value === 'MONGODB') {
+    return getMongoDbSyncList();
+  }
+  return getSpaceTimeDbSyncList();
+}
+
+async function syncLocalToProvider(clearLocalAfterSync = false) {
+  if (manualSyncLoading.value || !storageMode.value || !dbReachable.value) {
+    if (!dbReachable.value) utils.flashm('Database is offline.', { error: true });
     return;
   }
 
-  syncToSpaceTimeDbLoading.value = true;
+  manualSyncLoading.value = true;
   let synced = 0;
   let cleared = 0;
   let failed = 0;
+  const label = 'DB';
 
   try {
     const localEntryMap = await collectLocalEntries();
 
-    con.log('[SpaceTimeDB] Local sync candidates', {
+    con.log(`[${label}] Local sync candidates`, {
       total: localEntryMap.size,
       keys: [...localEntryMap.keys()],
     });
@@ -594,7 +667,7 @@ async function syncLocalToSpaceTimeDb(clearLocalAfterSync = false) {
       const entryId = decodeURIComponent(rawEntryId);
 
       try {
-        await upsertEntry({
+        await upsertProviderEntry({
           entryId,
           mediaType,
           sourceUrl: item.sourceUrl || localUrl,
@@ -616,7 +689,7 @@ async function syncLocalToSpaceTimeDb(clearLocalAfterSync = false) {
         }
       } catch (error) {
         failed++;
-        con.error('[SpaceTimeDB] Failed syncing local entry', { localUrl, error });
+        con.error(`[${label}] Failed syncing local entry`, { localUrl, error });
       }
     }
 
@@ -624,40 +697,41 @@ async function syncLocalToSpaceTimeDb(clearLocalAfterSync = false) {
       utils.flashm('No local anime/manga entries found to sync.');
     } else if (failed) {
       if (clearLocalAfterSync) {
-        utils.flashm(`SpaceTimeDB sync completed: ${synced} synced, ${cleared} cleared, ${failed} failed.`);
+        utils.flashm(`${label} sync completed: ${synced} synced, ${cleared} cleared, ${failed} failed.`);
       } else {
-        utils.flashm(`SpaceTimeDB sync completed: ${synced} synced, ${failed} failed.`);
+        utils.flashm(`${label} sync completed: ${synced} synced, ${failed} failed.`);
       }
+    } else if (clearLocalAfterSync) {
+      utils.flashm(`${label} sync completed: ${synced} synced, ${cleared} local entries cleared.`);
     } else {
-      if (clearLocalAfterSync) {
-        utils.flashm(`SpaceTimeDB sync completed: ${synced} synced, ${cleared} local entries cleared.`);
-      } else {
-        utils.flashm(`SpaceTimeDB sync completed: ${synced} synced.`);
-      }
+      utils.flashm(`${label} sync completed: ${synced} synced.`);
     }
 
     refresh();
   } catch (error) {
-    con.error('[SpaceTimeDB] Failed to start local sync', error);
-    utils.flashm('Failed to sync local entries to SpaceTimeDB.');
+    con.error(`[${label}] Failed to start local sync`, error);
+    utils.flashm(`Failed to sync local entries to ${label}.`);
   } finally {
-    syncToSpaceTimeDbLoading.value = false;
+    manualSyncLoading.value = false;
   }
 }
 
-async function syncSpaceTimeDbToLocal() {
-  if (syncToSpaceTimeDbLoading.value) {
+async function syncProviderToLocal() {
+  if (manualSyncLoading.value || !storageMode.value || !dbReachable.value) {
+    if (!dbReachable.value) utils.flashm('Database is offline.', { error: true });
     return;
   }
 
-  syncToSpaceTimeDbLoading.value = true;
+  manualSyncLoading.value = true;
   let imported = 0;
   let failed = 0;
+  const label = 'DB';
 
   try {
-    const sdbData = (await getSpaceTimeDbSyncList()) as Record<string, any>;
+    const providerData = (await loadProviderList()) as Record<string, any>;
+    const localEntryMap = await collectLocalEntries();
 
-    for (const key in sdbData) {
+    for (const key in providerData) {
       const mediaType = (utils.urlPart(key, 2) || '').toLowerCase();
       if (mediaType !== 'anime' && mediaType !== 'manga') {
         continue;
@@ -669,46 +743,51 @@ async function syncSpaceTimeDbToLocal() {
       }
 
       const entryId = decodeURIComponent(rawEntryId);
-      const item = sdbData[key] || {};
+      const item = providerData[key] || {};
       const preferredSourceUrl = typeof item.sourceUrl === 'string' ? item.sourceUrl : '';
-      const localUrl = /^local:\/\//i.test(preferredSourceUrl)
-        ? preferredSourceUrl
-        : `local://spacetimedb/${mediaType}/${encodeURIComponent(entryId)}`;
+      const localUrl = localUrlForProviderEntry(
+        entryId,
+        mediaType,
+        preferredSourceUrl,
+        localEntryMap,
+      );
 
       try {
+        const existing = localEntryMap.get(localUrl) || {};
         await api.storage.set(localUrl, {
-          name: item.name || entryId,
-          tags: typeof item.tags === 'string' ? item.tags : '',
-          sUrl: item.sUrl || '',
-          image: item.image || '',
+          ...existing,
+          name: item.name || existing.name || entryId,
+          tags: typeof item.tags === 'string' ? item.tags : existing.tags || '',
+          sUrl: item.sUrl || existing.sUrl || '',
+          image: item.image || existing.image || '',
           progress: Math.max(0, Number(item.progress) || 0),
           volumeprogress: Math.max(0, Number(item.volumeprogress) || 0),
           score: Math.max(0, Number(item.score) || 0),
           status: Math.max(0, Number(item.status) || status.PlanToWatch),
-          sourceUrl: item.sourceUrl || '',
+          sourceUrl: item.sourceUrl || existing.sourceUrl || '',
         });
 
         imported++;
       } catch (error) {
         failed++;
-        con.error('[SpaceTimeDB] Failed importing SDB entry to local', { key, localUrl, error });
+        con.error(`[${label}] Failed importing entry to local`, { key, localUrl, error });
       }
     }
 
     if (!imported && !failed) {
-      utils.flashm('No SpaceTimeDB entries found to import.');
+      utils.flashm(`No ${label} entries found to import.`);
     } else if (failed) {
-      utils.flashm(`SDB -> Local completed: ${imported} imported, ${failed} failed.`);
+      utils.flashm(`${label} -> Local completed: ${imported} imported, ${failed} failed.`);
     } else {
-      utils.flashm(`SDB -> Local completed: ${imported} imported.`);
+      utils.flashm(`${label} -> Local completed: ${imported} imported.`);
     }
 
     refresh();
   } catch (error) {
-    con.error('[SpaceTimeDB] Failed importing entries to local', error);
-    utils.flashm('Failed to import entries from SpaceTimeDB to local.');
+    con.error(`[${label}] Failed importing entries to local`, error);
+    utils.flashm(`Failed to import entries from ${label} to local.`);
   } finally {
-    syncToSpaceTimeDbLoading.value = false;
+    manualSyncLoading.value = false;
   }
 }
 </script>

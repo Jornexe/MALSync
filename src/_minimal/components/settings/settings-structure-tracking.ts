@@ -13,6 +13,7 @@ import SettingsGroup from './settings-group.vue';
 import SettingsHr from './settings-hr.vue';
 import SettingsSpaceTimeProfile from './settings-spacetime-profile.vue';
 import SettingsMongoProfile from './settings-mongo-profile.vue';
+import SettingsMongoServer from './settings-mongo-server.vue';
 import { localStore } from '../../../utils/localStore';
 
 export const trackingSimple: ConfObj[] = [
@@ -178,14 +179,7 @@ export const trackingSimple: ConfObj[] = [
     title: () => 'MongoDB Server URL',
     condition: () =>
       api.settings.get('syncMode') === 'MONGODB' || api.settings.get('syncModeSimkl') === 'MONGODB',
-    props: {
-      component: 'input',
-      option: 'mongoServerUrl',
-      props: {
-        validation: (value: string) => Boolean(value && /^https?:\/\//i.test(value)),
-      },
-    },
-    component: SettingsGeneral,
+    component: SettingsMongoServer,
   },
   {
     key: 'mongoApiKey',

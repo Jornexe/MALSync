@@ -67,10 +67,11 @@ export const Mangadex: pageInterface = {
       return utils.absoluteLink(`/title/${mangaData.id}`, Mangadex.domain);
     },
     getEpisode(url) {
-      return parseInt(chapterData.chapter) || 1;
+      const chapter = parseFloat(chapterData.chapter);
+      return Number.isFinite(chapter) ? chapter : 1;
     },
     getVolume(url) {
-      return parseInt(chapterData.volume);
+      return parseFloat(chapterData.volume) || 0;
     },
     nextEpUrl(url) {
       const dir = $('.rtl').length ? 'left' : 'right';
@@ -155,7 +156,8 @@ export const Mangadex: pageInterface = {
         let epText = selector.find('.font-bold:not(.ml-1):not(a)').first().text();
         // single line
         if (!epText) epText = selector.find('a').first().attr('title')!;
-        const ep = epText.match(/ch(apter)?\.? *(\d+)/i);
+        // Capture decimals (e.g. Ch. 2.1, Chapter 12.5).
+        const ep = epText.match(/ch(apter)?\.? *(\d+(?:\.\d+)?)/i);
         if (!ep) return 0;
         return Number(ep[2]);
       },
@@ -184,54 +186,58 @@ export const Mangadex: pageInterface = {
     check();
 
     async function check() {
-      resetAwaitUi();
-      resetawaitReader();
-      clearInterval(listUpdate);
-      if (
-        !Mangadex.isSyncPage(window.location.href) &&
-        !Mangadex.isOverviewPage!(window.location.href)
-      )
-        return;
+      try {
+        resetAwaitUi();
+        resetawaitReader();
+        clearInterval(listUpdate);
+        if (
+          !Mangadex.isSyncPage(window.location.href) &&
+          !Mangadex.isOverviewPage!(window.location.href)
+        )
+          return;
 
-      let manga: any = {};
+        let manga: any = {};
 
-      if (Mangadex.isSyncPage(window.location.href)) {
-        const chapterResponse = await request(
-          `chapter/${utils.urlPart(window.location.href, 4)}?includes[]=manga`,
-        );
-        const chapter = JSON.parse(chapterResponse.responseText);
-        chapterData.chapter = chapter.data.attributes.chapter;
-        chapterData.volume = chapter.data.attributes.volume;
-        chapterData.translatedLanguage = chapter.data.attributes.translatedLanguage;
-        manga.data = chapter.data.relationships.find(relation => relation.type === 'manga');
-        await awaitReader();
+        if (Mangadex.isSyncPage(window.location.href)) {
+          const chapterResponse = await request(
+            `chapter/${utils.urlPart(window.location.href, 4)}?includes[]=manga`,
+          );
+          const chapter = JSON.parse(chapterResponse.responseText);
+          chapterData.chapter = chapter.data.attributes.chapter;
+          chapterData.volume = chapter.data.attributes.volume;
+          chapterData.translatedLanguage = chapter.data.attributes.translatedLanguage;
+          manga.data = chapter.data.relationships.find(relation => relation.type === 'manga');
+          await awaitReader();
+        }
+        if (Mangadex.isOverviewPage!(window.location.href)) {
+          const id = utils.urlPart(window.location.href, 4);
+          if (id.toLowerCase() === 'random') throw 'The random page is not supported';
+          const mangaResponse = await request(`manga/${id}?includes[]=cover_art`);
+          manga = JSON.parse(mangaResponse.responseText);
+          await awaitUi();
+
+          listUpdate = utils.changeDetect(
+            () => page.handleList(),
+            () => $('.chapter').first().text() + $('.chapter').last().text(),
+          );
+        }
+
+        mangaData.id = manga.data.id;
+        const titleData = manga.data.attributes.title;
+        mangaData.title =
+          titleData[`${manga.data.attributes.originalLanguage}-ro`] ??
+          titleData.en ??
+          titleData[manga.data.attributes.originalLanguage] ??
+          titleData[Object.keys(titleData)[0]];
+        mangaData.links = manga.data.attributes.links;
+        mangaData.coverFilename = manga.data.relationships?.find(
+          relation => relation.type === 'cover_art',
+        )?.attributes?.fileName;
+
+        await page.handlePage();
+      } catch (e) {
+        con.error('Mangadex', e);
       }
-      if (Mangadex.isOverviewPage!(window.location.href)) {
-        const id = utils.urlPart(window.location.href, 4);
-        if (id.toLowerCase() === 'random') throw 'The random page is not supported';
-        const mangaResponse = await request(`manga/${id}?includes[]=cover_art`);
-        manga = JSON.parse(mangaResponse.responseText);
-        await awaitUi();
-
-        listUpdate = utils.changeDetect(
-          () => page.handleList(),
-          () => $('.chapter').first().text() + $('.chapter').last().text(),
-        );
-      }
-
-      mangaData.id = manga.data.id;
-      const titleData = manga.data.attributes.title;
-      mangaData.title =
-        titleData[`${manga.data.attributes.originalLanguage}-ro`] ??
-        titleData.en ??
-        titleData[manga.data.attributes.originalLanguage] ??
-        titleData[Object.keys(titleData)[0]];
-      mangaData.links = manga.data.attributes.links;
-      mangaData.coverFilename = manga.data.relationships?.find(
-        relation => relation.type === 'cover_art',
-      )?.attributes?.fileName;
-
-      page.handlePage();
     }
   },
 };

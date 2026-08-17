@@ -39,10 +39,12 @@ export const MangaReader: pageInterface = {
       return jsonData.manga_url;
     },
     getEpisode(url) {
-      return parseInt(jsonData.chapter!);
+      const chapter = parseFloat(jsonData.chapter!);
+      return Number.isFinite(chapter) ? chapter : 0;
     },
     getVolume(url) {
-      return parseInt(jsonData.volume!);
+      const volume = parseFloat(jsonData.volume!);
+      return Number.isFinite(volume) ? volume : 0;
     },
     nextEpUrl(url) {
       return jsonData.next_chapter_url || jsonData.next_volume_url;

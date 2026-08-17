@@ -22,7 +22,7 @@ export const RoliaScan: PageInterface = {
       return $c.string('/manga/').concat($c.this('sync.getIdentifier').run()).urlAbsolute().run();
     },
     getEpisode($c) {
-      return $c.url().urlPart(5).regex('chapter[_-](\\d+)', 1).number().run();
+      return $c.url().urlPart(5).regex('chapter[_-](\\d+(?:\\.\\d+)?)', 1).number().run();
     },
     readerConfig: [
       {

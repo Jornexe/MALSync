@@ -102,7 +102,7 @@ export const MangaBall: PageInterface = {
         .run();
     },
     elementEp($c) {
-      return $c.find('.chapter-number').text().regex('(\\d+)', 1).number().run();
+      return $c.find('.chapter-number').text().regex('(\\d+(?:\\.\\d+)?)', 1).number().run();
     },
   },
   lifecycle: {

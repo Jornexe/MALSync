@@ -135,4 +135,4 @@ export const Kagane: PageInterface = {
     },
   },
 };
-const ChRegex = '(?:Ch\\.|Chapter|Ep\\.|Episode|Round)\\s*(\\d+)|(\\d+)\\.';
+const ChRegex = '(?:Ch\\.|Chapter|Ep\\.|Episode|Round)\\s*(\\d+(?:\\.\\d+)?)|(\\d+(?:\\.\\d+)?)\\.';

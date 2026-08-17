@@ -6,7 +6,7 @@ import { fullscreenNotification, PlayerSingleton } from '../utils/player';
 import { SearchClass } from '../_provider/Search/vueSearchClass';
 import { emitter } from '../utils/emitter';
 import { Cache } from '../utils/Cache';
-import { NotFoundError, UrlNotSupportedError } from '../_provider/Errors';
+import { NotFoundError, ServerOfflineError, UrlNotSupportedError } from '../_provider/Errors';
 import { localStore } from '../utils/localStore';
 import { getPageConfig } from '../utils/test';
 import { status } from '../_provider/definitions';
@@ -161,7 +161,36 @@ export class SyncPage {
     this.searchObj = searchObj;
   }
 
+  private showPageError(error) {
+    logger.error(error);
+    if (this.singleObj) {
+      this.singleObj.flashmError(error);
+      try {
+        this.fillUI();
+      } catch (fillErr) {
+        logger.error(fillErr);
+      }
+      return;
+    }
+    const message =
+      error instanceof ServerOfflineError
+        ? 'Server Offline'
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    utils.flashm(message || 'Sync failed', { error: true, type: 'error' });
+  }
+
   async handlePage(curUrl = window.location.href) {
+    try {
+      await this.handlePageInner(curUrl);
+    } catch (e) {
+      // Provider / network failures must not become uncaught rejections.
+      this.showPageError(e);
+    }
+  }
+
+  private async handlePageInner(curUrl = window.location.href) {
     // [perf] temporary load-time instrumentation — remove once UI load is tuned.
     const perfStart = performance.now();
     const perf = (label: string) =>
@@ -181,7 +210,7 @@ export class SyncPage {
         on: 'SYNC',
         title: this.page.sync.getTitle(this.url),
         identifier: this.page.sync.getIdentifier(this.url),
-        detectedEpisode: parseInt(`${this.page.sync.getEpisode(this.url)}`),
+        detectedEpisode: parseFloat(`${this.page.sync.getEpisode(this.url)}`),
       };
 
       this.setSearchObj(
@@ -200,6 +229,7 @@ export class SyncPage {
       } catch (e) {
         if (e instanceof UrlNotSupportedError) {
           this.incorrectUrl();
+          return;
         }
         throw e;
       }
@@ -212,7 +242,8 @@ export class SyncPage {
         }
       } else {
         state.episode =
-          state.detectedEpisode + parseInt(this.searchObj.getRuledOffset(state.detectedEpisode));
+          state.detectedEpisode +
+          parseFloat(`${this.searchObj.getRuledOffset(state.detectedEpisode)}`);
       }
 
       if (typeof this.page.sync.getVolume !== 'undefined') {
@@ -255,6 +286,7 @@ export class SyncPage {
       } catch (e) {
         if (e instanceof UrlNotSupportedError) {
           this.incorrectUrl();
+          return;
         }
         throw e;
       }
@@ -316,7 +348,7 @@ export class SyncPage {
       } catch (e) {
         if (e instanceof UrlNotSupportedError) {
           this.incorrectUrl();
-          throw e;
+          return;
         } else if (
           e instanceof NotFoundError &&
           (syncMode === 'SPACETIMEDB' || syncMode === 'MONGODB')
@@ -332,10 +364,12 @@ export class SyncPage {
           this.singleObj = tempSingle;
         } else {
           if (tempSingle) this.singleObj = tempSingle;
-          this.singleObj.flashmError(e);
-          this.fillUI();
-          throw e;
+          this.showPageError(e);
+          return;
         }
+      }
+      if (this.singleObj) {
+        this.singleObj.setLocalBackupUrl(localUrl);
       }
       perf('single update');
 
@@ -893,8 +927,7 @@ export class SyncPage {
         this.fillUI();
       })
       .catch(e => {
-        this.singleObj.flashmError(e);
-        throw e;
+        this.showPageError(e);
       });
   }
 
@@ -1034,22 +1067,32 @@ export class SyncPage {
       typeof this.page.overview.list !== 'undefined'
     ) {
       const epList = this.getEpList();
-      if (typeof epList !== 'undefined' && epList.length > 0) {
+      // Float chapter keys (e.g. 2.1) don't affect Array.length, so use key count.
+      const epListHasEntries =
+        typeof epList !== 'undefined' &&
+        Object.keys(epList).some(k => typeof (epList as any)[k] !== 'undefined');
+      if (epListHasEntries) {
         this.offsetHandler(epList);
         if (this.page.overview.list.elementUrl) {
           const { elementUrl } = this.page.overview.list;
           logger.log(
             'Episode List',
-            j.$.map(epList, function (val, i) {
-              if (typeof val !== 'undefined') {
-                return elementUrl(val);
-              }
-              return '-';
-            }),
+            Object.keys(epList)
+              .map(Number)
+              .filter(n => Number.isFinite(n))
+              .sort((a, b) => a - b)
+              .map(i => {
+                const val = (epList as any)[i];
+                if (typeof val !== 'undefined') {
+                  return elementUrl(val);
+                }
+                return '-';
+              }),
           );
           if (typeof this.page.overview.list.handleListHook !== 'undefined')
             this.page.overview.list.handleListHook(this.singleObj.getEpisode(), epList);
-          const curEp = epList[parseInt(this.singleObj.getEpisode() || 1)];
+          const currentEpNum = Number(this.singleObj.getEpisode() || 1);
+          const curEp = epList[currentEpNum as any];
           if (
             typeof curEp === 'undefined' &&
             !curEp &&
@@ -1067,11 +1110,18 @@ export class SyncPage {
             }
           }
 
-          const nextEp = epList[this.singleObj.getEpisode() + 1];
+          // Next chapter may be a decimal (e.g. 2.1 → 2.2), not always +1.
+          let nextEpNum: number | undefined;
+          Object.keys(epList).forEach(key => {
+            const n = Number(key);
+            if (!Number.isFinite(n) || n <= currentEpNum) return;
+            if (nextEpNum === undefined || n < nextEpNum) nextEpNum = n;
+          });
+          const nextEp = nextEpNum !== undefined ? epList[nextEpNum as any] : undefined;
           if (typeof nextEp !== 'undefined' && nextEp && !this.page.isSyncPage(this.url)) {
             const message = `<a href="${elementUrl(nextEp)}">${api.storage.lang(
               `syncPage_malObj_nextEp_${this.page.type}`,
-              [this.singleObj.getEpisode() + 1],
+              [String(nextEpNum)],
             )}</a>`;
             utils.flashm(message, {
               hoverInfo: true,
@@ -1094,12 +1144,12 @@ export class SyncPage {
       const { elementEp } = this.page.overview.list;
       let currentEpisode = 0;
       if (this.singleObj) {
-        currentEpisode = parseInt(this.singleObj.getEpisode());
+        currentEpisode = Number(this.singleObj.getEpisode()) || 0;
       }
 
       this.page.overview.list.elementsSelector().each(function (index, el) {
         try {
-          const epNumber = parseInt(`${elementEp(j.$(el))}`);
+          const epNumber = parseFloat(`${elementEp(j.$(el))}`);
 
           let offset = 0;
           if (This.searchObj && This.searchObj.getRuledOffset(epNumber)) {
@@ -1115,7 +1165,8 @@ export class SyncPage {
           }
 
           const elEp = epNumber + offset;
-          elementArray[elEp] = j.$(el);
+          // Sparse array still works with float keys (e.g. chapter 2.1).
+          elementArray[elEp as any] = j.$(el);
 
           j.$(el).attr('data-mal-sync-episode', elEp);
           if (elEp !== epNumber) {
@@ -1410,6 +1461,9 @@ export class SyncPage {
       })
       .then(() => {
         this.fillUI();
+      })
+      .catch(e => {
+        this.showPageError(e);
       });
   }
 
@@ -1422,14 +1476,18 @@ export class SyncPage {
       return;
     }
 
-    this.singleObj.setStreamingUrl(this.url);
-    await this.singleObj.sync();
-    await this.singleObj.update();
-    this.fillUI();
-    utils.flashm('Reading URL updated.', {
-      success: true,
-      type: 'stdb-reading-url-updated',
-    });
+    try {
+      this.singleObj.setStreamingUrl(this.url);
+      await this.singleObj.sync();
+      await this.singleObj.update();
+      this.fillUI();
+      utils.flashm('Reading URL updated.', {
+        success: true,
+        type: 'stdb-reading-url-updated',
+      });
+    } catch (e) {
+      this.showPageError(e);
+    }
   }
 
   private async updateImage() {

@@ -16,7 +16,7 @@ export const AuroraScans: PageInterface = {
         .and(
           $c.url().urlPart(3).equals('series').run(),
           $c.url().urlPart(5).boolean().run(),
-          $c.url().urlPart(5).matches('chapter[_-]?(\\d+)').run(),
+          $c.url().urlPart(5).matches('chapter[_-]?(\\d+(?:\\.\\d+)?)').run(),
         )
         .run();
     },
@@ -37,7 +37,13 @@ export const AuroraScans: PageInterface = {
         .run();
     },
     getEpisode($c) {
-      return $c.url().urlPart(5).regex('(\\d+)$', 1).number().ifNotReturn().run();
+      return $c
+        .url()
+        .urlPart(5)
+        .regex('(\\d+(?:\\.\\d+)?)$', 1)
+        .number()
+        .ifNotReturn()
+        .run();
     },
     readerConfig: [
       {

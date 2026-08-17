@@ -1,5 +1,10 @@
 Forked to allow fully selfhosted sync via mongo +restapi.
 
+You need a mongodb server running.
+You need Nodejs.
+Then go into /mongodb-backend and run ``npm run build`` 
+and then ``npm run start``. (this can be a bit of a pain if you don't have this automatically start, or a server to run this on.)
+
 [![Discord](https://img.shields.io/discord/358599430502481920.svg?style=flat-square&logo=discord&label=Chat%20%2F%20Support&colorB=7289DA)](https://discord.com/invite/cTH4yaw)
 [![Issues](https://img.shields.io/github/issues/MALSync/MALSync.svg?style=flat-square&logo=github&logoColor=white)](https://github.com/MALSync/MALSync/issues)
 [![CodeFactor](https://www.codefactor.io/repository/github/MALSync/MALSync/badge)](https://www.codefactor.io/repository/github/MALSync/MALSync)

@@ -1,5 +1,6 @@
 import { ListAbstract, listElement } from '../listAbstract';
 import { status } from '../definitions';
+import { buildProviderUrl } from '../../utils/slugs';
 import {
   bakaStateToState,
   call,
@@ -83,14 +84,14 @@ export class UserList extends ListAbstract {
     }
   }
 
-  private limit = 100;
+  private limit = 50;
 
   async getPart() {
     if (this.listType !== 'manga') {
       throw new Error('MangaBaka only supports manga');
     }
 
-    this.limit = 100;
+    this.limit = 50;
     this.offset = Math.max(1, this.offset);
     if (this.modes.frontend && !this.modes.sortAiring) {
       this.limit = 24;
@@ -139,7 +140,7 @@ export class UserList extends ListAbstract {
         cacheKey: el.Series.source.my_anime_list.id || `mangabaka:${el.series_id}`,
         type: this.listType,
         title: el.Series.title,
-        url: `https://mangabaka.org/${el.series_id}`,
+        url: buildProviderUrl('MANGABAKA', 'manga', el.series_id),
         score: el.rating ? Math.round(el.rating / 10) : 0,
         watchedEp: el.progress_chapter || 0,
         readVol: el.progress_volume || 0,

@@ -2,6 +2,7 @@ import { PageInterface } from './pageInterface';
 
 import { animeav1 } from './implementations/animeav1/main';
 import { anicrush } from './implementations/anicrush/main';
+import { anikoto } from './implementations/AniKoto/main';
 import { mangaNato } from './implementations/mangaNato/main';
 import { gojo } from './implementations/gojo/main';
 import { animeLib } from './implementations/animeLib/main';
@@ -11,10 +12,8 @@ import { anizm } from './implementations/anizm/main';
 import { toonily } from './implementations/toonily/main';
 import { voidScans } from './implementations/VoidScans/main';
 import { AniXL } from './implementations/AniXL/main';
-import { bato } from './implementations/bato/main';
 import { Crunchyroll } from './implementations/Crunchyroll/main';
 import { animevost } from './implementations/animevost/main';
-import { AnimeKAI } from './implementations/AnimeKAI/main';
 import { FireAnime } from './implementations/FireAnime/main';
 import { WeebCentral } from './implementations/WeebCentral/main';
 import { MangaDemon } from './implementations/MangaDemon/main';
@@ -80,30 +79,45 @@ import { MangaSushi } from './implementations/MangaSushi/main';
 import { Comix } from './implementations/Comix/main';
 import { DynastyScans } from './implementations/DynastyScans/main';
 import { LagoonScans } from './implementations/LagoonScans/main';
-import { WeebDex } from './implementations/WeebDex/main';
 import { SetsuScans } from './implementations/SetsuScans/main';
 import { Mgeko } from './implementations/Mgeko/main';
+import { MangaClash } from './implementations/MangaClash/main';
 import { LuaScans } from './implementations/LuaScans/main';
 import { KaynScan } from './implementations/KaynScan/main';
 import { ComicWalker } from './implementations/ComicWalker/main';
 import { MangaLivreTV } from './implementations/MangaLivreTV/main';
 import { SanaScans } from './implementations/SanaScans/main';
 import { RezoScans } from './implementations/RezoScans/main';
+import { Sekai } from './implementations/Sekai/main';
 import { RageScans } from './implementations/RageScans/main';
 import { AniGo } from './implementations/AniGo/main';
 import { Kuudere } from './implementations/Kuudere/main';
 import { BigSolo } from './implementations/BigSolo/main';
 import { Plex } from './implementations/Plex/main';
 import { allManga } from './implementations/allManga/main';
+import { Mkissa } from './implementations/Mkissa/main';
 import { GaiaFlix } from './implementations/GaiaFlix/main';
 import { AniZone } from './implementations/AniZone/main';
 import { AnimeNexus } from './implementations/AnimeNexus/main';
 import { templeScan } from './implementations/TempleScan/main';
+import { ElfToon } from './implementations/ElfToon/main';
 import { TeamShadowi } from './implementations/TeamShadowi/main';
+import { TopManhua } from './implementations/TopManhua/main';
+import { DMMTV } from './implementations/DMMTV/main';
+import { Tsukuyomi } from './implementations/Tsukuyomi/main';
+import { HijalaScans } from './implementations/HijalaScans/main';
+import { Jellyfin } from './implementations/Jellyfin/main';
+import { AnimeStream } from './implementations/AnimeStream/main';
+import { MangaFire } from './implementations/MangaFire/main';
+import { AnimesDigital } from './implementations/AnimesDigital/main';
+import { YummyAni } from './implementations/YummyAni/main';
+import { DonghuaStream } from './implementations/DonghuaStream/main';
+import { BSTO } from './implementations/BSTO/main';
 
 export const pages: { [key: string]: PageInterface } = {
   animeav1,
   anicrush,
+  anikoto,
   mangaNato,
   gojo,
   animeLib,
@@ -113,10 +127,8 @@ export const pages: { [key: string]: PageInterface } = {
   toonily,
   voidScans,
   AniXL,
-  bato,
   Crunchyroll,
   animevost,
-  AnimeKAI,
   FireAnime,
   WeebCentral,
   MangaDemon,
@@ -182,24 +194,38 @@ export const pages: { [key: string]: PageInterface } = {
   Comix,
   DynastyScans,
   LagoonScans,
-  WeebDex,
   SetsuScans,
   Mgeko,
+  MangaClash,
+  TopManhua,
   LuaScans,
   KaynScan,
   ComicWalker,
   MangaLivreTV,
   SanaScans,
   RezoScans,
+  Sekai,
   RageScans,
   AniGo,
   Kuudere,
   BigSolo,
   Plex,
   allManga,
+  Mkissa,
   GaiaFlix,
   AniZone,
   AnimeNexus,
   templeScan,
+  ElfToon,
   TeamShadowi,
+  DMMTV,
+  Tsukuyomi,
+  HijalaScans,
+  Jellyfin,
+  AnimeStream,
+  MangaFire,
+  AnimesDigital,
+  YummyAni,
+  DonghuaStream,
+  BSTO,
 };

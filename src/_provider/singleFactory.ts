@@ -1,6 +1,8 @@
 import { urlToSlug } from '../utils/slugs';
 import * as helper from './helper';
+import { SyncTypes } from './helper';
 import { Cache } from '../utils/Cache';
+import { SingleAbstract } from './singleAbstract';
 
 import { Single as MalSingle } from './MyAnimeList_hybrid/single';
 import { Single as MalApiSingle } from './MyAnimeList_api/single';
@@ -12,6 +14,18 @@ import { Single as ShikiSingle } from './Shikimori/single';
 import { Single as LocalSingle } from './Local/single';
 import { Single as SpaceTimeDbSingle } from './SpaceTimeDB/single';
 import { Single as MongoDbSingle } from './MongoDB/single';
+
+export const singleClasses: { [key in SyncTypes]: new (url: string) => SingleAbstract } = {
+  MAL: MalSingle,
+  MALAPI: MalApiSingle,
+  ANILIST: AnilistSingle,
+  KITSU: KitsuSingle,
+  MANGABAKA: MangaBakaSingle,
+  SIMKL: SimklSingle,
+  SHIKI: ShikiSingle,
+  SPACETIMEDB: SpaceTimeDbSingle,
+  MONGODB: MongoDbSingle,
+};
 
 export function getSingle(url: string) {
   if (/^local:\/\//i.test(url)) {
@@ -48,34 +62,10 @@ export function getSingle(url: string) {
   }
 
   const syncMode = helper.getSyncMode(slug.path.type);
-  if (syncMode === 'MAL') {
-    return new MalSingle(url);
+  if (!singleClasses[syncMode]) {
+    throw 'Unknown sync mode';
   }
-  if (syncMode === 'MALAPI') {
-    return new MalApiSingle(url);
-  }
-  if (syncMode === 'ANILIST') {
-    return new AnilistSingle(url);
-  }
-  if (syncMode === 'KITSU') {
-    return new KitsuSingle(url);
-  }
-  if (syncMode === 'MANGABAKA') {
-    return new MangaBakaSingle(url);
-  }
-  if (syncMode === 'SIMKL') {
-    return new SimklSingle(url);
-  }
-  if (syncMode === 'SHIKI') {
-    return new ShikiSingle(url);
-  }
-  if (syncMode === 'SPACETIMEDB') {
-    return new SpaceTimeDbSingle(url);
-  }
-  if (syncMode === 'MONGODB') {
-    return new MongoDbSingle(url);
-  }
-  throw 'Unknown sync mode';
+  return new singleClasses[syncMode](url);
 }
 
 export async function getRulesCacheKey(

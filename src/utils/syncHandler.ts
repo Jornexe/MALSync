@@ -44,7 +44,8 @@ export function getType(url) {
   if (utils.isDomainMatching(url, 'kitsu.app')) return 'KITSU';
   if (utils.isDomainMatching(url, 'myanimelist.net')) return 'MAL';
   if (utils.isDomainMatching(url, 'simkl.com')) return 'SIMKL';
-  if (utils.isDomainMatching(url, 'shikimori.one')) return 'SHIKI';
+  if (utils.isDomainMatching(url, 'shikimori.one') || utils.isDomainMatching(url, 'shikimori.io'))
+    return 'SHIKI';
   if (utils.isDomainMatching(url, 'mangabaka.org')) return 'MANGABAKA';
   if (/^stdb:\/\//i.test(url)) return 'SPACETIMEDB';
   if (/^mongo:\/\//i.test(url)) return 'MONGODB';

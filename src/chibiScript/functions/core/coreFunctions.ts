@@ -111,10 +111,7 @@ export default {
         : Property extends `${string}.elementsSelector` | 'elementsSelector'
           ? Element[]
           : Property extends
-                | `${string}.getEpisode`
-                | 'getEpisode'
-                | `${string}.getVolume`
-                | 'getVolume'
+                `${string}.getEpisode` | 'getEpisode' | `${string}.getVolume` | 'getVolume'
             ? number
             : Property extends `${string}.nextEpUrl` | 'nextEpUrl'
               ? string | undefined | boolean
@@ -372,7 +369,7 @@ export default {
     input: void,
     name: string,
     callback: ChibiJson<string>,
-    defaultValue: string = '',
+    defaultValue = '',
   ) {
     const storageKey = `mal-sync-css-var${name}`;
 

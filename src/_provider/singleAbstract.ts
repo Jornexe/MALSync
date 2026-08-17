@@ -6,6 +6,7 @@ import { predictionXhrGET, ProgressItem } from '../background/releaseProgressUti
 import { emitter, globalEmit } from '../utils/emitter';
 import { SafeError } from '../utils/errors';
 import { returnYYYYMMDD } from '../utils/general';
+import { buildProviderUrl } from '../utils/slugs';
 import { errorMessage as _errorMessage } from './Errors';
 import { point10 } from './ScoreMode/point10';
 import { SyncTypes } from './helper';
@@ -219,7 +220,7 @@ export abstract class SingleAbstract {
     // Allow decimal chapter numbers (e.g. 2.1, 2.2) common in manga.
     episode = parseFloat(`${episode}`);
     if (!Number.isFinite(episode) || episode < 0) episode = 0;
-    if (this.getTotalEpisodes() && episode > this.getTotalEpisodes())
+    if (this.getTotalEpisodes() && episode > this.getTotalEpisodes() && this.finishedAiring())
       episode = this.getTotalEpisodes();
     this._setEpisode(episode);
     return this;
@@ -363,7 +364,7 @@ export abstract class SingleAbstract {
       res.push({
         name: 'MAL',
         icon: 'https://cdn.myanimelist.net/images/favicon.ico',
-        link: `https://myanimelist.net/${this.type}/${this.ids.mal}`,
+        link: buildProviderUrl('MAL', this.type!, this.ids.mal),
       });
     }
 
@@ -371,7 +372,7 @@ export abstract class SingleAbstract {
       res.push({
         name: 'AniList',
         icon: 'https://anilist.co/img/icons/favicon-32x32.png',
-        link: `https://anilist.co/${this.type}/${this.ids.ani}`,
+        link: buildProviderUrl('ANILIST', this.type!, this.ids.ani),
       });
     }
 
@@ -379,7 +380,7 @@ export abstract class SingleAbstract {
       res.push({
         name: 'Kitsu',
         icon: 'https://kitsu.app/favicon-32x32-3e0ecb6fc5a6ae681e65dcbc2bdf1f17.png',
-        link: `https://kitsu.app/${this.type}/${this.ids.kitsu.id}`,
+        link: buildProviderUrl('KITSU', this.type!, this.ids.kitsu.id),
       });
     }
 
@@ -387,7 +388,7 @@ export abstract class SingleAbstract {
       res.push({
         name: 'Simkl',
         icon: 'https://eu.simkl.in/img_favicon/v2/favicon-32x32.png',
-        link: `https://simkl.com/${this.type}/${this.ids.simkl}`,
+        link: buildProviderUrl('SIMKL', this.type!, this.ids.simkl),
       });
     }
 
@@ -615,7 +616,7 @@ export abstract class SingleAbstract {
 
   public getMalUrl(): string | null {
     if (!Number.isNaN(this.ids.mal)) {
-      return `https://myanimelist.net/${this.getType()}/${this.ids.mal}`;
+      return buildProviderUrl('MAL', this.getType()!, this.ids.mal);
     }
     return null;
   }

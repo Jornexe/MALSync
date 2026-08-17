@@ -9,6 +9,7 @@ import { getRulesCacheKey, getSingle } from '../singleFactory';
 import { RulesClass } from './rulesClass';
 
 import { getSyncMode } from '../helper';
+import { buildProviderUrl } from '../../utils/slugs';
 
 interface SearchResult {
   id?: number;
@@ -321,7 +322,7 @@ export class SearchClass {
 
     let returnUrl = '';
 
-    if (id !== 'Not-Found') returnUrl = `https://myanimelist.net/${this.page.type}/${id}`;
+    if (id !== 'Not-Found') returnUrl = buildProviderUrl('MAL', this.page.type, id);
 
     return {
       url: returnUrl,

@@ -9,7 +9,7 @@ export const Comix: PageInterface = {
   urls: {
     match: ['*://comix.to/*'],
   },
-  search: 'https://comix.to/browser?keyword={searchtermPlus}&order=relevance%3Adesc',
+  search: 'https://comix.to/browse?q={searchtermPlus}&sort=relevance%3Adesc',
   sync: {
     isSyncPage($c) {
       return getJsonData($c).get('page').equals('chapter').run();
@@ -26,9 +26,6 @@ export const Comix: PageInterface = {
     getEpisode($c) {
       return getJsonData($c).get('number').number().run();
     },
-    getImage($c) {
-      return $c.querySelector('[itemprop="image"]').getAttribute('src').ifNotReturn().run();
-    },
     getMalUrl($c) {
       return $c
         .providerUrlUtility({
@@ -39,14 +36,12 @@ export const Comix: PageInterface = {
     },
     readerConfig: [
       {
-        current: {
-          selector: '.progress-line > span.p, .progress-line > span.c',
-          mode: 'count',
-        },
-        total: {
-          selector: '.progress-line > span',
-          mode: 'count',
-        },
+        current: $c =>
+          $c
+            .querySelectorAll('.rpage-progress__seg.is-visited, .rpage-progress__seg.is-active')
+            .length()
+            .run(),
+        total: $c => $c.querySelectorAll('.rpage-progress__seg').length().run(),
       },
     ],
   },
@@ -61,10 +56,10 @@ export const Comix: PageInterface = {
       return getJsonData($c).get('manga_id').run();
     },
     getImage($c) {
-      return $c.querySelector('[itemprop="image"]').getAttribute('src').ifNotReturn().run();
+      return $c.querySelector('.mpage__poster img').getAttribute('src').ifNotReturn().run();
     },
     uiInjection($c) {
-      return $c.querySelector('.description').uiBefore().run();
+      return $c.querySelector('.mpage__desc-wrap').uiBefore().run();
     },
     getMalUrl($c) {
       return $c.provider().this('sync.getMalUrl').run();
@@ -72,13 +67,13 @@ export const Comix: PageInterface = {
   },
   list: {
     elementsSelector($c) {
-      return $c.querySelectorAll('.chap-list > li:not(.head)').run();
+      return $c.querySelectorAll('.mchap-list > .mchap-item').run();
     },
     elementUrl($c) {
       return $c.find('a').getAttribute('href').ifNotReturn().urlAbsolute().run();
     },
     elementEp($c) {
-      return $c.find('a b').text().regex('ch\\. (\\d+)', 1).number().run();
+      return $c.find('a').text().regex('ch\\.(\\d+)', 1).number().run();
     },
   },
   lifecycle: {
@@ -104,10 +99,16 @@ export const Comix: PageInterface = {
         .ifNotReturn($c.trigger().return().run())
         .run();
     },
+    overviewIsReady($c) {
+      return $c
+        .waitUntilTrue($c.querySelector('.mpage__desc-wrap').boolean().run())
+        .trigger()
+        .run();
+    },
     listChange($c) {
       return $c
         .detectChanges(
-          $c.querySelector('.chap-list > li:not(.head)').ifNotReturn().text().run(),
+          $c.querySelector('.mchap-foot__hint').ifNotReturn().text().run(),
           $c.trigger().run(),
         )
         .run();

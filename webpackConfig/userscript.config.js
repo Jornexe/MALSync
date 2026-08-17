@@ -155,6 +155,11 @@ module.exports = {
       vue: '@vue/runtime-dom',
     },
   },
+  resolveLoader: {
+    alias: {
+      'to-string-loader': require.resolve('./utils/toStringLoader'),
+    },
+  },
   output: {
     filename: 'malsync.user.js',
     path: path.resolve(__dirname, '..', 'dist'),
@@ -183,6 +188,7 @@ module.exports = {
       __VUE_OPTIONS_API__: true,
       __VUE_PROD_DEVTOOLS__: false,
       __MAL_SYNC_KEYS__: JSON.stringify(getKeys()),
+      __IS_FIREFOX__: false,
     }),
     new webpack.optimize.LimitChunkCountPlugin({
       maxChunks: 1,

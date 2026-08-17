@@ -9,10 +9,10 @@ jobs:
   webextension:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
     - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
-        node-version: '22.x'
+        node-version: '24.x'
     - name: Build
       run: |
         npm ci
@@ -40,10 +40,10 @@ jobs:
   webextension-firefox:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
     - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
-        node-version: '22.x'
+        node-version: '24.x'
     - name: Build
       run: |
         npm ci
@@ -72,10 +72,10 @@ jobs:
   userscript:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
     - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
-        node-version: '22.x'
+        node-version: '24.x'
     - name: Build
       run: |
         npm ci
@@ -103,10 +103,10 @@ jobs:
   chrome:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
     - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
-        node-version: '22.x'
+        node-version: '24.x'
     - name: Build
       run: |
         npm ci
@@ -132,10 +132,10 @@ jobs:
   edge:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
     - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
-        node-version: '22.x'
+        node-version: '24.x'
     - name: Build
       run: |
         npm ci
@@ -150,7 +150,7 @@ jobs:
       run: |
         npm run package
     - name: Deploy Edge
-      uses: wdzeng/edge-addon@d4db1eea77297a24d799394dec87e8912e0902f9 # v2
+      uses: wdzeng/edge-addon@9881f57720358040d079eaa06a4596dc9c273eb6 # v2
       with:
         product-id: ${{ secrets.EDGE_PRODUCT_ID }}
         zip-path: dist/webextension.zip
@@ -160,10 +160,10 @@ jobs:
   firefox:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
     - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
-        node-version: '22.x'
+        node-version: '24.x'
     - name: Build
       run: |
         npm ci

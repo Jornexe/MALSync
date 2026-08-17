@@ -436,23 +436,28 @@ async function loadNext() {
   await listRequest.data.getNextPage();
 }
 
+let scrollDebounce: ReturnType<typeof setTimeout>;
+
 const handleScroll = () => {
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore
-  if (
-    rootWindow.pageYOffset + rootWindow.innerHeight >
-    rootDocument.documentElement.scrollHeight - 600
-  ) {
-    // Reveal more of the already-loaded list first; only ask the provider for a
-    // new page once the whole in-memory list is on screen (server-paginated
-    // providers still need this).
-    if (list.value && renderLimit.value < list.value.length) {
-      renderLimit.value += RENDER_BATCH;
-      return;
+  clearTimeout(scrollDebounce);
+  scrollDebounce = setTimeout(() => {
+    if (
+      rootWindow.pageYOffset + rootWindow.innerHeight >
+      rootDocument.documentElement.scrollHeight - 600
+    ) {
+      // Reveal more of the already-loaded list first; only ask the provider for a
+      // new page once the whole in-memory list is on screen (server-paginated
+      // providers still need this).
+      if (list.value && renderLimit.value < list.value.length) {
+        renderLimit.value += RENDER_BATCH;
+        return;
+      }
+      loadNext();
     }
-    loadNext();
-  }
+  }, 100);
 };
+
+watch(list, () => handleScroll());
 
 watch(
   () => listRequest.data,

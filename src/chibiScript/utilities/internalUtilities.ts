@@ -1,41 +1,44 @@
 import type { ChibiGenerator, ChibiJson } from '../ChibiGenerator';
+import { providerUrls, ProviderIdentifier, UrlSyncMode } from '../../utils/slugs';
+
+export type ProviderKey = `${ProviderIdentifier}Id` | `${ProviderIdentifier}Url`;
 
 export default {
+  /**
+   * Executes a function with the current generator context
+   * @input any - Current context
+   * @param fn - Function to execute that takes the generator and returns a new generator
+   * @returns Result of the function execution
+   * @example
+   * function meta($c: ChibiGenerator<unknown>) {
+   *    return $c.getGlobalVariable('metadataGlobal');
+   * }
+   *
+   * $c.exec(meta).get('Type').run()
+   */
+  exec: <Input, Output>(
+    $c: ChibiGenerator<Input>,
+    fn: (c: ChibiGenerator<Input>) => ChibiGenerator<Output>,
+  ): ChibiGenerator<Output> => {
+    return fn($c);
+  },
+
   /**
    * Utility to generate provider URLs based on provided IDs or URLs
    */
   providerUrlUtility: (
     $c: ChibiGenerator<void>,
-    provider: {
-      [K in
-        | 'anilistId'
-        | 'anilistUrl'
-        | 'kitsuId'
-        | 'kitsuUrl'
-        | 'malId'
-        | 'malUrl']?: ChibiJson<any>;
-    },
+    provider: { [K in ProviderKey]?: ChibiJson<any> },
   ) => {
-    const providerConfig = [
-      {
-        provider: 'ANILIST',
-        urlKey: 'anilistUrl',
-        idKey: 'anilistId',
-        urlTemplate: 'https://anilist.co/manga/<identifier>',
-      },
-      {
-        provider: 'KITSU',
-        urlKey: 'kitsuUrl',
-        idKey: 'kitsuId',
-        urlTemplate: 'https://kitsu.app/manga/<identifier>',
-      },
-      {
-        provider: 'MAL',
-        urlKey: 'malUrl',
-        idKey: 'malId',
-        urlTemplate: 'https://myanimelist.net/manga/<identifier>',
-      },
-    ];
+    const providerConfig = (Object.keys(providerUrls) as UrlSyncMode[]).map(syncMode => {
+      const { identifier, urlTemplate } = providerUrls[syncMode];
+      return {
+        provider: syncMode,
+        urlKey: `${identifier}Url`,
+        idKey: `${identifier}Id`,
+        urlTemplate,
+      };
+    });
 
     const providerFunctions: ChibiJson<any>[] = [];
 
@@ -57,6 +60,7 @@ export default {
               $c
                 .string(config.urlTemplate)
                 .replace('<identifier>', $c.getVariable(config.idKey).run())
+                .replace('<type>', $c.getVariable<{ type: string }>('pageObject').get('type').run())
                 .return()
                 .run(),
             );

@@ -32,23 +32,6 @@ async function mixdrop() {
 
 // pages
 
-async function zoro() {
-  const response = await fetch('https://hianime.tv');
-  const body = await response.text();
-
-  const $ = cheerio.load(body);
-
-  const urls = $('ul.site-opt > li > a')
-    .map((i, el) => new URL($(el).attr('href')))
-    .get();
-
-  let formattedUrls = [];
-  for (const url of urls) {
-    formattedUrls.push('*://' + url.hostname + '/*');
-  }
-  formattedUrls.push('*://9animetv.to/*');
-  addPageUrls('Zoro', formattedUrls);
-}
 
 async function kickassanime() {
   const response = await fetch('https://watchanime.io');
@@ -67,43 +50,41 @@ async function kickassanime() {
   addPageUrls('KickAssAnime', formattedUrls);
 }
 
-async function animekai() {
-  const response = await fetch('https://animekai.pw/');
+async function miruro() {
+  const response = await fetch('https://www.miruro.com/#domains');
   const body = await response.text();
 
   const $ = cheerio.load(body);
 
-  const urls = $('.site-lists li > a')
+  const urls = $('nav.domains a.domain')
     .map((i, el) => new URL($(el).attr('href')))
     .get();
 
   let formattedUrls = [];
   for (const url of urls) {
-    formattedUrls.push('*://' + url.hostname + '/*');
+    const host = url.hostname.replace(/^www\./i, '');
+    formattedUrls.push('*://*.' + host + '/*');
   }
-  addChibiUrls('AnimeKAI', formattedUrls);
+
+  addChibiUrls('Miruro', [...new Set(formattedUrls)]);
 }
 
-async function bato() {
-  const response = await fetch('https://batotomirrors.pages.dev');
+async function anikoto() {
+  const response = await fetch('https://anikoto.site/#domains');
   const body = await response.text();
+
   const $ = cheerio.load(body);
 
-  // Bato url gave JS to list their bato endpoint when fetch() it.
-  const urlJS = $('script')
-    .map((i, el) => $(el).html())
-    .get()
-    .find(text => text.includes('const domains'));
-
-  const ExtractUrl = [...urlJS.matchAll(/url:\s*"(.*?)"/g)];
-  const urls = ExtractUrl.map(m => new URL(m[1]));
+  const urls = $('div.endpoint-row > div.endpoint-url > a')
+    .map((i, el) => new URL($(el).attr('href')))
+    .get();
 
   let formattedUrls = [];
   for (const url of urls) {
-    formattedUrls.push('*://' + url.hostname + '/*');
+    formattedUrls.push('*://*.' + url.hostname + '/*');
   }
-  addChibiUrls('bato', formattedUrls, 'mainV2.ts');
-  addChibiUrls('bato', formattedUrls, 'mainV3.ts');
+
+  addChibiUrls('AniKoto', [...new Set(formattedUrls)]);
 }
 
 async function mangapark() {
@@ -286,11 +267,10 @@ async function start() {
     voe,
     vidmoly,
     mixdrop,
-    zoro,
     kickassanime,
-    animekai,
-    bato,
+    miruro,
     mangapark,
+    anikoto,
   };
 
   // Lists all jobs to launch in parallel used in autoUrls.yml

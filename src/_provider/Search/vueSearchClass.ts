@@ -17,7 +17,6 @@ export class SearchClass extends SearchClassExtend {
       con.log('similarity', this.state.similarity.value);
       return false;
     }
-
     // Storage-only providers (SpaceTimeDB/MongoDB) own the entry once it is on
     // the list. In that case it is correct by definition, so don't keep nagging
     // with the correction UI (which could otherwise offer to link it to itself
@@ -32,7 +31,7 @@ export class SearchClass extends SearchClassExtend {
       return false;
     }
 
-    return this.openCorrection(true)!.then(() => {
+    return this.openCorrection(true).then(() => {
       return this.changed;
     });
   }

@@ -8,7 +8,7 @@ import {
 import type { BakaSeries, BakaSorting, BakaState } from './types';
 import { startFinishDate, status } from '../definitions';
 
-export const apiDomain = 'https://api.mangabaka.dev';
+export const apiDomain = 'https://api.mangabaka.org';
 
 export const authenticationUrl = 'https://malsync.moe/mangabaka/oauth';
 
@@ -75,6 +75,9 @@ export async function call(
       data: JSON.stringify(sData),
     })
     .then(async response => {
+      if ((response.status > 499 && response.status < 600) || response.status === 0) {
+        throw new ServerOfflineError(`Server Offline status: ${response.status}`);
+      }
       const res = parseJson(response.responseText);
       errorHandling(res, response.status);
       return res;
